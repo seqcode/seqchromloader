@@ -20,7 +20,7 @@ setup(
     # eg: 1.0.0, 1.0.1, 3.0.2, 5.0-beta, etc.
     # You CANNOT upload two versions of your package with the same version number
     # This field is REQUIRED
-    version="0.1.0",
+    version="0.1.1",
 
     # The packages that constitute your project.
     # For my project, I have only one - "pydash".
@@ -41,9 +41,9 @@ setup(
         'pybedtools>=0.9.0',
         'pysam>=0.19.0',
         'pybigwig>=0.3.0',
-        'pytorch>=1.10.0'
+        'torch>=1.10.0',
         'pytorch-lightning>=1.7.0,<1.8.0',
-    ]
+    ],
 
     # The description that will be shown on PyPI.
     # Keep it short and concise
