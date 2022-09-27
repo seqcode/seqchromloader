@@ -10,3 +10,7 @@ Training framework support:
 - pytorch dataloader (done)
 - pytorch-lightning datamodule (done)
 - NVIDIA-DALI (x)
+
+## Installation
+
+`pip install seqchromloader`
