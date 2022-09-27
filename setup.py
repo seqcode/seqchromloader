@@ -30,7 +30,7 @@ setup(
     # If you only have one file, instead of a package,
     # you can instead use the py_modules field instead.
     # EITHER py_modules OR packages should be present.
-    packages=find_packages(),
+    packages=find_packages(exclude='tests'),
 
     # dependencies
     install_requires=[
