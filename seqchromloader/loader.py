@@ -4,6 +4,7 @@ description = """
     Given bed file, return sequence and chromatin info
 """
 
+import logging
 import torch
 import random
 import pyfasta
@@ -27,12 +28,12 @@ class SeqChromLoader():
     def __init__(self, SeqChromDataset):
         self.SeqChromDataset = SeqChromDataset
 
-    def __call__(self, *args, batch_size=512, num_workers=1, shuffle=False, worker_init_fn=worker_init_fn, **kwargs):
+    def __call__(self, *args, worker_init_fn=worker_init_fn, dataloader_kws:dict=None, **kwargs):
+        # default dataloader kws
+        wif = dataloader_kws.pop("worker_init_fn", worker_init_fn) if dataloader_kws is not None else worker_init_fn
+
         return DataLoader(self.SeqChromDataset(*args, **kwargs),
-                            batch_size=batch_size,
-                            num_workers=num_workers,
-                            shuffle=shuffle,
-                            worker_init_fn=worker_init_fn)
+                            worker_init_fn=wif, **dataloader_kws)
 
 def seqChromLoaderCurry(SeqChromDataset):
 
@@ -52,25 +53,24 @@ class _SeqChromDatasetByWds(IterableDataset):
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
+        pipeline = [
+            wds.SimpleShardList(self.wds),
+            wds.tarfile_to_samples(),
+            wds.split_by_worker,
+            wds.decode(),
+            wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
+        ]
         if worker_info is None:
-            ds = wds.DataPipeline(
-                wds.SimpleShardList(self.wds),
-                wds.shuffle(100, rng=random.Random(1)),
-                wds.tarfile_to_samples(),
-                wds.shuffle(1000, rng=random.Random(1)),
-                wds.decode(),
-                wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
-            ) 
-        else:
-            ds = wds.DataPipeline(
-                wds.SimpleShardList(self.wds),
-                wds.shuffle(100, rng=random.Random(1)),
-                wds.split_by_worker,
-                wds.tarfile_to_samples(),
-                wds.shuffle(1000, rng=random.Random(1)),
-                wds.decode(),
-                wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
-            ) 
+            logging.info("Worker info not found, won't split dataset across subprocesses, are you using custom dataloader?")
+            logging.info("Ignore the message if you are not using multiprocessing on data loading")
+            del pipeline[2]
+        
+        # transform
+        if self.seq_transform is not None: pipeline.extend(self.seq_transform)
+        if self.chrom_transform is not None: pipeline.extend(self.chrom_transform)
+        if self.target_transform is not None: pipeline.extend(self.target_transform)
+
+        ds = wds.DataPipeline(*pipeline)
 
         return iter(ds)
 
@@ -107,8 +107,6 @@ class _SeqChromDatasetByBed(Dataset):
             for idx, bigwig in enumerate(self.bigwigs):
                 m = (np.nan_to_num(bigwig.values(entry.chrom, entry.start, entry.end))).astype(np.float32)
                 if entry.strand == "-": m = m[::-1] # reverse if needed
-                if self.scaler_mean and self.scaler_var:
-                    m = (m - self.scaler_mean[idx])/sqrt(self.scaler_var[idx])
                 ms.append(m)
         except RuntimeError as e:
             print(e)
@@ -204,8 +202,7 @@ class SeqChromDataModule(LightningDataModule):
         self.batch_size_per_rank = int(self.batch_size/world_size)
 
         if stage in ["fit", "validate", "test"] or stage is None:
-
-            self.train_loader = wds.DataPipeline(
+            train_pipeline = [
                 wds.SimpleShardList(self.train_wds),
                 wds.shuffle(100, rng=random.Random(1)),
                 split_by_node(global_rank, world_size),
@@ -214,24 +211,41 @@ class SeqChromDataModule(LightningDataModule):
                 wds.shuffle(1000, rng=random.Random(1)),
                 wds.decode(),
                 wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
-            ) 
+            ]
 
-            self.val_loader = wds.DataPipeline(
+            val_pipeline = [
                 wds.SimpleShardList(self.val_wds),
                 split_by_node(global_rank, world_size),
                 wds.split_by_worker,
                 wds.tarfile_to_samples(),
                 wds.decode(),
                 wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
-            )
+            ]
 
-            self.test_loader = wds.DataPipeline(
+            test_pipeline = [
                 wds.SimpleShardList(self.test_wds),
                 split_by_node(global_rank, world_size),
                 wds.split_by_worker,
                 wds.tarfile_to_samples(),
                 wds.decode(),
                 wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
+            ]
+
+            if self.transform is not None:
+                train_pipeline.extend(self.transform)
+                val_pipeline.extend(self.transform)
+                test_pipeline.extend(self.transform)
+
+            self.train_loader = wds.DataPipeline(
+                *train_pipeline
+            ) 
+
+            self.val_loader = wds.DataPipeline(
+                *val_pipeline
+            )
+
+            self.test_loader = wds.DataPipeline(
+                *test_pipeline
             )
 
     def train_dataloader(self):

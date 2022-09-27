@@ -19,9 +19,8 @@ import webdataset as wds
 
 from seqchromloader import utils
 
-def get_data_webdataset(coords, genome_fasta, chromatin_tracks,
+def dump_data_webdataset(coords, genome_fasta, chromatin_tracks,
                         tf_bam=None, 
-                        nbins=None, 
                         outdir="dataset/", outprefix="seqchrom", 
                         reverse=False, compress=False, 
                         numProcessors=1, chroms_scaler=None):
@@ -37,8 +36,8 @@ def get_data_webdataset(coords, genome_fasta, chromatin_tracks,
     # freeze the common parameters
     ## create a scaler to get statistics for normalizing chromatin marks input
     ## also create a multiprocessing lock
-    get_data_worker_freeze = functools.partial(get_data_webdataset_worker, 
-                                                    fasta=genome_fasta, nbins=nbins, 
+    dump_data_worker_freeze = functools.partial(dump_data_webdataset_worker, 
+                                                    fasta=genome_fasta, 
                                                     bigwig_files=chromatin_tracks,
                                                     tf_bam=tf_bam,
                                                     reverse=reverse, 
@@ -46,7 +45,7 @@ def get_data_webdataset(coords, genome_fasta, chromatin_tracks,
                                                     outdir=outdir)
 
     pool = Pool(numProcessors)
-    res = pool.starmap_async(get_data_worker_freeze, zip(chunks, [outprefix + "_" + str(i) for i in range(num_chunks)]))
+    res = pool.starmap_async(dump_data_worker_freeze, zip(chunks, [outprefix + "_" + str(i) for i in range(num_chunks)]))
     res = res.get()
 
     # fit the scaler if provided
@@ -58,10 +57,10 @@ def get_data_webdataset(coords, genome_fasta, chromatin_tracks,
 
     return files
 
-def get_data_webdataset_worker(coords, outprefix, fasta, bigwig_files,
+def dump_data_webdataset_worker(coords, outprefix, fasta, bigwig_files,
                                 tf_bam=None, 
                                 outdir="dataset/", 
-                                nbins=None, reverse=False, compress=True):
+                                reverse=False, compress=True):
     # get handlers
     genome_pyfasta = pyfasta.Fasta(fasta)
     bigwigs = [pyBigWig.open(bw) for bw in bigwig_files]
@@ -87,10 +86,7 @@ def get_data_webdataset_worker(coords, outprefix, fasta, bigwig_files,
         ms = []
         try:
             for idx, bigwig in enumerate(bigwigs):
-                m = (np.nan_to_num(bigwig.values(item.chrom, item.start, item.end)))
-                if nbins:
-                    m = (m.reshape((nbins, -1))
-                          .mean(axis=1, dtype=np.float32))
+                m = (np.nan_to_num(bigwig.values(item.chrom, item.start, item.end))).astype(np.float32)
                 if reverse:
                     m = m[::-1] 
                 ms.append(m)

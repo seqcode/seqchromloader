@@ -1,2 +1,2 @@
 from .loader import SeqChromDatasetByBed, SeqChromDatasetByWds, SeqChromDataModule
-from .writer import get_data_webdataset
+from .writer import dump_data_webdataset
