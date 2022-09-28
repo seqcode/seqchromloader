@@ -7,6 +7,7 @@ description = """
 import logging
 import torch
 import random
+import pysam
 import pyfasta
 import pyBigWig
 import numpy as np
@@ -28,22 +29,25 @@ class SeqChromLoader():
     def __init__(self, SeqChromDataset):
         self.SeqChromDataset = SeqChromDataset
 
-    def __call__(self, *args, worker_init_fn=worker_init_fn, dataloader_kws:dict=None, **kwargs):
+    def __call__(self, *args, dataloader_kws:dict=None, **kwargs):
         # default dataloader kws
-        wif = dataloader_kws.pop("worker_init_fn", worker_init_fn) if dataloader_kws is not None else worker_init_fn
+        if dataloader_kws is not None:
+            wif = dataloader_kws.pop("worker_init_fn", worker_init_fn)
+            num_workers = dataloader_kws.pop("num_workers", 1) 
+        else:
+            wif = worker_init_fn
+            num_workers = 1
 
         return DataLoader(self.SeqChromDataset(*args, **kwargs),
-                            worker_init_fn=wif, **dataloader_kws)
+                            worker_init_fn=wif, num_workers=num_workers, **dataloader_kws)
 
 def seqChromLoaderCurry(SeqChromDataset):
 
     return SeqChromLoader(SeqChromDataset)
 
 class _SeqChromDatasetByWds(IterableDataset):
-    def __init__(self, wds, seq_transform:list=None, chrom_transform:list=None, target_transform:list=None):
-        self.seq_transform = seq_transform
-        self.chrom_transform = chrom_transform
-        self.target_transform = target_transform
+    def __init__(self, wds, transforms:dict=None):
+        self.transforms = transforms
 
         self.wds = wds
 
@@ -58,7 +62,10 @@ class _SeqChromDatasetByWds(IterableDataset):
             wds.tarfile_to_samples(),
             wds.split_by_worker,
             wds.decode(),
-            wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
+            wds.rename(seq="seq.npy",
+                       chrom="chrom.npy",
+                       target="target.npy",
+                       label="label.npy")
         ]
         if worker_info is None:
             logging.info("Worker info not found, won't split dataset across subprocesses, are you using custom dataloader?")
@@ -66,10 +73,11 @@ class _SeqChromDatasetByWds(IterableDataset):
             del pipeline[2]
         
         # transform
-        if self.seq_transform is not None: pipeline.extend(self.seq_transform)
-        if self.chrom_transform is not None: pipeline.extend(self.chrom_transform)
-        if self.target_transform is not None: pipeline.extend(self.target_transform)
+        if self.transforms is not None: 
+            pipeline.append(wds.map_dict(**self.transforms))
 
+        pipeline.append(wds.to_tuple("seq", "chrom", "target", "label"))
+            
         ds = wds.DataPipeline(*pipeline)
 
         return iter(ds)
@@ -77,59 +85,48 @@ class _SeqChromDatasetByWds(IterableDataset):
 SeqChromDatasetByWds = seqChromLoaderCurry(_SeqChromDatasetByWds)
 
 class _SeqChromDatasetByBed(Dataset):
-    def __init__(self, bed, fasta, bigwig_files, seq_transform:list=None, chrom_transform:list=None, target_transform:list=None):
-        self.bed = pd.read_table(bed, header=None, names=['chrom', 'start', 'end', 'name', 'score', 'strand' ])
+    def __init__(self, bed, genome_fasta, bigwig_filelist:list, target_bam=None, transforms:dict=None, initialize_first=False):
+        self.bed = pd.read_table(bed, header=None, names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
 
-        self.fasta = fasta
-        self.bigwig_files = bigwig_files
-        self.seq_transform = [utils.DNA2OneHot()] + seq_transform # prepend default DNA one hot coding transform
-        self.chrom_transfrom = chrom_transform
-        self.target_transform = target_transform
+        self.genome_fasta = genome_fasta
+        self.genome_pyfasta = None
+        self.bigwig_filelist = bigwig_filelist
+        self.bigwigs = None
+        self.target_bam = target_bam
+        self.target_pysam = None
+
+        self.transforms = transforms
+
+        if initialize_first: self.initialize()
     
     def initialize(self):
         # this function will be called by worker_init_function in DataLoader
-        self.genome_pyfasta = pyfasta.Fasta(self.config["train_bichrom"]["fasta"])
-        #self.tfbam = pysam.AlignmentFile(self.config["train_bichrom"]["tf_bam"])
-        self.bigwigs = [pyBigWig.open(bw) for bw in self.bigwig_files]
+        self.genome_pyfasta = pyfasta.Fasta(self.genome_fasta)
+        self.bigwigs = [pyBigWig.open(bw) for bw in self.bigwig_filelist]
+        if self.target_bam is not None:
+            self.target_pysam = pysam.AlignmentFile(self.target_bam)
     
     def __len__(self):
         return len(self.bed)
 
     def __getitem__(self, idx):
-        entry = self.bed.iloc[idx,]
-        # get info in the each entry region
-        ## sequence
-        sequence = self.genome_pyfasta[entry.chrom][int(entry.start):int(entry.end)]
-        sequence = self.rev_comp(sequence) if entry.strand=="-" else sequence
-        ## chromatin
-        ms = []
+        item = self.bed.iloc[idx,]
         try:
-            for idx, bigwig in enumerate(self.bigwigs):
-                m = (np.nan_to_num(bigwig.values(entry.chrom, entry.start, entry.end))).astype(np.float32)
-                if entry.strand == "-": m = m[::-1] # reverse if needed
-                ms.append(m)
-        except RuntimeError as e:
-            print(e)
-            raise Exception(f"Failed to extract chromatin {self.bigwig_files[idx]} information in region {entry}")
-        ms = np.vstack(ms)
-        ## target: read count in region
-        #target = self.tfbam.count(entry.chrom, entry.start, entry.end)
-        
-        # transform
-        if self.seq_transform:
-            seq = [t(sequence) for t in self.seq_transform]
-        if self.chrom_transfrom:
-            ms = [t(ms) for t in self.chrom_transfrom]
+            feature = utils.extract_info(
+                item.chrom,
+                item.start,
+                item.end,
+                item.label,
+                genome_pyfasta=self.genome_pyfasta,
+                bigwigs=self.bigwigs,
+                target_bam=self.target_pysam,
+                strand=item.strand,
+                transforms=self.transforms
+            )
+        except utils.BigWigInaccessible as e:
+            raise e
 
-        return seq, ms
-
-    def rev_comp(self, inp_str):
-        rc_dict = {'A': 'T', 'G': 'C', 'T': 'A', 'C': 'G', 'c': 'g',
-                   'g': 'c', 't': 'a', 'a': 't', 'n': 'n', 'N': 'N'}
-        outp_str = list()
-        for nucl in inp_str:
-            outp_str.append(rc_dict[nucl])
-        return ''.join(outp_str)[::-1] 
+        return feature['seq'], feature['chrom'], feature['target'], feature['label']
 
 SeqChromDatasetByBed = seqChromLoaderCurry(_SeqChromDatasetByBed)
 
@@ -170,17 +167,18 @@ def _target_vlog(sample):
 target_vlog = wds.pipelinefilter(_target_vlog)
 
 class SeqChromDataModule(LightningDataModule):
-    def __init__(self, train_wds, val_wds, test_wds, train_dataset_size:int=None, transform:list=None, num_workers=8, batch_size=512):
+    def __init__(self, train_wds, val_wds, test_wds, train_dataset_size:int=None, transforms:dict=None, num_workers=1, batch_size=512, patch_last=True):
         super().__init__()
         self.num_workers = num_workers
         self.batch_size = batch_size
         self.train_dataset_size = train_dataset_size
+        self.patch_last = patch_last
 
         self.train_wds = train_wds
         self.val_wds = val_wds
         self.test_wds = test_wds
 
-        self.transform = transform
+        self.transforms = transforms
 
     def prepare_data(self):
         pass
@@ -210,7 +208,10 @@ class SeqChromDataModule(LightningDataModule):
                 wds.tarfile_to_samples(),
                 wds.shuffle(1000, rng=random.Random(1)),
                 wds.decode(),
-                wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
+                wds.rename(seq="seq.npy",
+                       chrom="chrom.npy",
+                       target="target.npy",
+                       label="label.npy")
             ]
 
             val_pipeline = [
@@ -219,7 +220,10 @@ class SeqChromDataModule(LightningDataModule):
                 wds.split_by_worker,
                 wds.tarfile_to_samples(),
                 wds.decode(),
-                wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
+                wds.rename(seq="seq.npy",
+                       chrom="chrom.npy",
+                       target="target.npy",
+                       label="label.npy")
             ]
 
             test_pipeline = [
@@ -228,28 +232,37 @@ class SeqChromDataModule(LightningDataModule):
                 wds.split_by_worker,
                 wds.tarfile_to_samples(),
                 wds.decode(),
-                wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
+                wds.rename(seq="seq.npy",
+                       chrom="chrom.npy",
+                       target="target.npy",
+                       label="label.npy")
             ]
 
-            if self.transform is not None:
-                train_pipeline.extend(self.transform)
-                val_pipeline.extend(self.transform)
-                test_pipeline.extend(self.transform)
+            if self.transforms is not None:
+                train_pipeline.append(wds.map_dict(**self.transforms))
+                val_pipeline.append(wds.map_dict(**self.transforms))
+                test_pipeline.append(wds.map_dict(**self.transforms))
 
-            self.train_loader = wds.DataPipeline(
-                *train_pipeline
-            ) 
+            self.train_loader = wds.DataPipeline([
+                *train_pipeline,
+                wds.to_tuple("seq", "chrom", "target", "label")
+            ]) 
 
-            self.val_loader = wds.DataPipeline(
-                *val_pipeline
-            )
+            self.val_loader = wds.DataPipeline([
+                *val_pipeline,
+                wds.to_tuple("seq", "chrom", "target", "label"),
+            ])
 
-            self.test_loader = wds.DataPipeline(
-                *test_pipeline
-            )
+            self.test_loader = wds.DataPipeline([
+                *test_pipeline,
+                wds.to_tuple("seq", "chrom", "target", "label"),
+            ])
 
     def train_dataloader(self):
-        return wds.WebLoader(self.train_loader.repeat(2), num_workers=self.num_workers, batch_size=self.batch_size_per_rank).with_epoch(ceil(self.train_dataset_size/self.batch_size)) # pad the last batch if there is remainder
+        if self.patch_last:
+            return wds.WebLoader(self.train_loader.repeat(2), num_workers=self.num_workers, batch_size=self.batch_size_per_rank).with_epoch(ceil(self.train_dataset_size/self.batch_size)) # pad the last batch if there is remainder
+        else:
+            return wds.WebLoader(self.train_loader, num_workers=self.num_workers, batch_size=self.batch_size_per_rank)
 
     def val_dataloader(self):
         return wds.WebLoader(self.val_loader, num_workers=self.num_workers, batch_size=self.batch_size_per_rank)

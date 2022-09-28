@@ -4,6 +4,7 @@ DNA sequence data.
 """
 import pandas as pd
 import numpy as np
+import logging
 from multiprocessing import Pool
 from pybedtools import Interval, BedTool
 
@@ -267,13 +268,83 @@ class DNA2OneHot(object):
                 continue
         return seqMatrix
 
+def dna2OneHot(dnaSeq):
+    DNA2Index = {
+            "A": 0,
+            "C": 1, 
+            "G": 2,
+            "T": 3,
+        }
+    
+    seqLen = len(dnaSeq)
+    # initialize the matrix as 4 x len(dnaSeq)
+    seqMatrix = np.zeros((4, len(dnaSeq)), dtype=np.float32)
+    # change the value to matrix
+    dnaSeq = dnaSeq.upper()
+    for j in range(0, seqLen):
+        if dnaSeq[j] == "N": continue
+        try:
+            seqMatrix[DNA2Index[dnaSeq[j]], j] = 1
+        except KeyError as e:
+            print(f"Keyerror happened at position {j}: {dnaSeq[j]}, legal keys are: [A, C, G, T, N]")
+            continue
+    return seqMatrix
+
 def rev_comp(inp_str):
     rc_dict = {'A': 'T', 'G': 'C', 'T': 'A', 'C': 'G', 'c': 'g',
                'g': 'c', 't': 'a', 'a': 't', 'n': 'n', 'N': 'N'}
     outp_str = list()
     for nucl in inp_str:
         outp_str.append(rc_dict[nucl])
-    return ''.join(outp_str)[::-1]    
+    return ''.join(outp_str)[::-1]  
+
+class BigWigInaccessible(Exception):
+    def __init__(self, chrom, start, end, *args):
+        super.__init__(*args)
+        self.chrom = chrom
+        self.start = start
+        self.end = end
+
+    def __str__(self) -> str:
+        return f'Chromatin Info Inaccessible in region {self.chrom}:{self.start}-{self.end}'
+
+def extract_info(chrom, start, end, label, genome_pyfasta, bigwigs, target_bam, strand="+", transforms:dict=None):
+    seq = genome_pyfasta[chrom][int(start):int(end)]
+    if strand=="-":
+        seq = rev_comp(seq)
+    seq_array = dna2OneHot(seq)
+
+    #chromatin track
+    chroms_array = []
+    try:
+        for idx, bigwig in enumerate(bigwigs):
+            c = (np.nan_to_num(bigwig.values(chrom, start, end))).astype(np.float32)
+            if strand=="-":
+                c = c[::-1] 
+            chroms_array.append(c)
+    except RuntimeError as e:
+        logging.warning(e)
+        logging.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
+        raise BigWigInaccessible(chrom, start, end)
+    chroms_array = np.vstack(chroms_array)  # create the chromatin track array, shape (num_tracks, length)
+    # label
+    label_array = np.array(label, dtype=np.int32)[np.newaxis]
+    # counts
+    target_array = target_bam.count(chrom, start, end) if target_bam is not None else np.nan
+    target_array = np.array(target_array, dtype=np.float32)[np.newaxis]
+
+    feature = {
+        'seq': seq_array,
+        'chrom': chroms_array,
+        'target': target_array,
+        'label': label_array
+    }
+
+    if transforms is not None:
+        for k,t in transforms.items(): 
+            feature[k] = t(feature[k])
+    
+    return feature
 
 if __name__ == "__main__":
     chip_seq_coordinates = load_chipseq_data("Bichrom/sample_data/Ascl1.peaks", genome_sizes_file="Bichrom/sample_data/mm10.info",
