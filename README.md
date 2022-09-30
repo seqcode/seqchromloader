@@ -13,4 +13,14 @@ Training framework support:
 
 ## Installation
 
+### conda (suggested):
+
+`mamba install -c bioconda -c conda-forge seqchromloader`
+
+or
+
+`conda install -c bioconda -c conda-forge seqchromloader`
+
+### pip
+
 `pip install seqchromloader`
