@@ -42,7 +42,7 @@ setup(
         'pysam>=0.19.0',
         'pybigwig>=0.3.0',
         'torch>=1.10.0',
-        'pytorch-lightning>=1.7.0,<1.8.0',
+        'pytorch-lightning',
     ],
 
     # The description that will be shown on PyPI.
