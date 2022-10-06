@@ -300,7 +300,7 @@ def rev_comp(inp_str):
 
 class BigWigInaccessible(Exception):
     def __init__(self, chrom, start, end, *args):
-        super.__init__(*args)
+        super().__init__(*args)
         self.chrom = chrom
         self.start = start
         self.end = end
