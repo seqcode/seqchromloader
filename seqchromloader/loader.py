@@ -29,7 +29,7 @@ class SeqChromLoader():
     def __init__(self, SeqChromDataset):
         self.SeqChromDataset = SeqChromDataset
 
-    def __call__(self, *args, dataloader_kws:dict=None, **kwargs):
+    def __call__(self, *args, dataloader_kws:dict={}, **kwargs):
         # default dataloader kws
         if dataloader_kws is not None:
             wif = dataloader_kws.pop("worker_init_fn", worker_init_fn)
