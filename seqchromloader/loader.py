@@ -59,8 +59,8 @@ class _SeqChromDatasetByWds(IterableDataset):
         worker_info = torch.utils.data.get_worker_info()
         pipeline = [
             wds.SimpleShardList(self.wds),
-            wds.tarfile_to_samples(),
             wds.split_by_worker,
+            wds.tarfile_to_samples(),
             wds.decode(),
             wds.rename(seq="seq.npy",
                        chrom="chrom.npy",
