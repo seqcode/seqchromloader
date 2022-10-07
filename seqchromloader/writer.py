@@ -69,7 +69,7 @@ def dump_data_webdataset_worker(coords,
     sink = wds.TarWriter(filename, compress=compress)
     for rindex, item in enumerate(coords.itertuples()):
         feature_dict = defaultdict()
-        feature_dict["__key__"] = f"{item.chrom}:{item.start}-{item.end}" 
+        feature_dict["__key__"] = f"{rindex}_{item.chrom}:{item.start}-{item.end}_{item.strand}" 
 
         try:
             feature = utils.extract_info(
