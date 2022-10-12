@@ -316,17 +316,20 @@ def extract_info(chrom, start, end, label, genome_pyfasta, bigwigs, target_bam, 
 
     #chromatin track
     chroms_array = []
-    try:
-        for idx, bigwig in enumerate(bigwigs):
-            c = (np.nan_to_num(bigwig.values(chrom, start, end))).astype(np.float32)
-            if strand=="-":
-                c = c[::-1] 
-            chroms_array.append(c)
-    except RuntimeError as e:
-        logging.warning(e)
-        logging.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
-        raise BigWigInaccessible(chrom, start, end)
-    chroms_array = np.vstack(chroms_array)  # create the chromatin track array, shape (num_tracks, length)
+    if bigwigs is not None and len(bigwigs)>0:
+        try:
+            for idx, bigwig in enumerate(bigwigs):
+                c = (np.nan_to_num(bigwig.values(chrom, start, end))).astype(np.float32)
+                if strand=="-":
+                    c = c[::-1] 
+                chroms_array.append(c)
+        except RuntimeError as e:
+            logging.warning(e)
+            logging.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
+            raise BigWigInaccessible(chrom, start, end)
+        chroms_array = np.vstack(chroms_array)  # create the chromatin track array, shape (num_tracks, length)
+    else:
+        chroms_array = None
     # label
     label_array = np.array(label, dtype=np.int32)[np.newaxis]
     # counts
