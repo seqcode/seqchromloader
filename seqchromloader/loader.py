@@ -259,13 +259,16 @@ class SeqChromDataModule(LightningDataModule):
             ])
 
     def train_dataloader(self):
+        num_workers = self.num_workers if self.num_workers < len(self.train_wds) else len(self.train_wds)
         if self.patch_last:
-            return wds.WebLoader(self.train_loader.repeat(2), num_workers=self.num_workers, batch_size=self.batch_size_per_rank).with_epoch(ceil(self.train_dataset_size/self.batch_size)) # pad the last batch if there is remainder
+            return wds.WebLoader(self.train_loader.repeat(2), num_workers=num_workers, batch_size=self.batch_size_per_rank).with_epoch(ceil(self.train_dataset_size/self.batch_size)) # pad the last batch if there is remainder
         else:
-            return wds.WebLoader(self.train_loader, num_workers=self.num_workers, batch_size=self.batch_size_per_rank)
+            return wds.WebLoader(self.train_loader, num_workers=num_workers, batch_size=self.batch_size_per_rank)
 
     def val_dataloader(self):
-        return wds.WebLoader(self.val_loader, num_workers=self.num_workers, batch_size=self.batch_size_per_rank)
+        num_workers = self.num_workers if self.num_workers < len(self.val_wds) else len(self.val_wds)
+        return wds.WebLoader(self.val_loader, num_workers=num_workers, batch_size=self.batch_size_per_rank)
 
     def test_dataloader(self):
-        return wds.WebLoader(self.test_loader, num_workers=self.num_workers, batch_size=self.batch_size_per_rank)
+        num_workers = self.num_workers if self.num_workers < len(self.test_wds) else len(self.test_wds)
+        return wds.WebLoader(self.test_loader, num_workers=num_workers, batch_size=self.batch_size_per_rank)
