@@ -57,7 +57,6 @@ class _SeqChromDatasetByWds(IterableDataset):
         pass
 
     def __iter__(self):
-        worker_info = torch.utils.data.get_worker_info()
         pipeline = [
             wds.SimpleShardList(self.wds),
             split_by_node(self.rank, self.world_size),
@@ -69,10 +68,6 @@ class _SeqChromDatasetByWds(IterableDataset):
                        target="target.npy",
                        label="label.npy")
         ]
-        if worker_info is None:
-            logging.info("Worker info not found, won't split dataset across subprocesses, are you using custom dataloader?")
-            logging.info("Ignore the message if you are not using multiprocessing on data loading")
-            del pipeline[2]
         
         # transform
         if self.transforms is not None: 
