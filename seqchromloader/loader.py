@@ -46,7 +46,8 @@ def seqChromLoaderCurry(SeqChromDataset):
     return SeqChromLoader(SeqChromDataset)
 
 class _SeqChromDatasetByWds(IterableDataset):
-    def __init__(self, wds, transforms:dict=None):
+    def __init__(self, wds, transforms:dict=None, rank=0, world_size=1):
+        self.wds = wds
         self.transforms = transforms
 
         self.rank = rank
