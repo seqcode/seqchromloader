@@ -49,7 +49,8 @@ class _SeqChromDatasetByWds(IterableDataset):
     def __init__(self, wds, transforms:dict=None):
         self.transforms = transforms
 
-        self.wds = wds
+        self.rank = rank
+        self.world_size = world_size
 
     def initialize(self):
         # this function will be called by worker_init_function in DataLoader
@@ -59,6 +60,7 @@ class _SeqChromDatasetByWds(IterableDataset):
         worker_info = torch.utils.data.get_worker_info()
         pipeline = [
             wds.SimpleShardList(self.wds),
+            split_by_node(self.rank, self.world_size),
             wds.split_by_worker,
             wds.tarfile_to_samples(),
             wds.decode(),
