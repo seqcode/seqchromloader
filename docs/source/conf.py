@@ -18,13 +18,18 @@ import sys
 sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 
 # import MOCK
-autodoc_mock_imports = ["torch",
-                        "pysam",
-                        "pybedtools",
-                        "pyfasta",
-                        "pyBigWig",
-                        "pytorch_lightning",
-                        "webdataset"]
+from unittest import mock
+
+# Mock open3d because it fails to build in readthedocs
+MOCK_MODULES = ["torch",
+                "pysam",
+                "pybedtools",
+                "pyfasta",
+                "pyBigWig",
+                "pytorch_lightning",
+                "webdataset"]
+for mod_name in MOCK_MODULES:
+    sys.modules[mod_name] = mock.Mock()
 
 # -- Project information -----------------------------------------------------
 
@@ -54,12 +59,6 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 
-
-# -- Options for HTML output -------------------------------------------------
-
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-#
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3/', None),
     'sphinx': ('https://www.sphinx-doc.org/en/master/', None),
