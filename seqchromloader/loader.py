@@ -26,8 +26,13 @@ def worker_init_fn(worker_id):
     dataset.initialize()
 
 class SeqChromLoader():
+    """
+    :param dataloader_kws: keyword arguments passed to ``torch.utils.data.DataLoader``
+    :type dataloader_kws: dict of kwargs
+    """
     def __init__(self, SeqChromDataset):
         self.SeqChromDataset = SeqChromDataset
+        self.__doc__ = self.__doc__ + self.SeqChromDataset.__doc__
 
     def __call__(self, *args, dataloader_kws:dict={}, **kwargs):
         # default dataloader kws
@@ -46,6 +51,12 @@ def seqChromLoaderCurry(SeqChromDataset):
     return SeqChromLoader(SeqChromDataset)
 
 class _SeqChromDatasetByWds(IterableDataset):
+    """
+    :param wds: list of webdataset files to get samples from
+    :type wds: list of str
+    :param transforms: A dictionary of functions to transform the output data, accepted keys are **["seq", "chrom", "target", "label"]**
+    :type transforms: dict of functions
+    """
     def __init__(self, wds, transforms:dict=None, rank=0, world_size=1):
         self.wds = wds
         self.transforms = transforms
@@ -83,6 +94,18 @@ class _SeqChromDatasetByWds(IterableDataset):
 SeqChromDatasetByWds = seqChromLoaderCurry(_SeqChromDatasetByWds)
 
 class _SeqChromDatasetByBed(Dataset):
+    """
+    :param bed: Bed file describing genomics regions to extract info from, every region has to be of the same length.
+    :type bed: str
+    :param genome_fasta: Genome fasta file.
+    :type genome_fasta: str
+    :param bigwig_filelist: A list of bigwig files containing track information (e.g., histone modifications)
+    :type bigwig_filelist: list of str or None
+    :param target_bam: bam file to get # reads in each region
+    :type target_bam: str or None
+    :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
+    :type transforms: dict of functions
+    """
     def __init__(self, bed, genome_fasta, bigwig_filelist:list, target_bam=None, transforms:dict=None, initialize_first=False):
         self.bed = pd.read_table(bed, header=None, names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
 

@@ -26,8 +26,26 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                         numProcessors=1,
                         transforms=None):
     """
-    Given coordinates dataframe, extract the sequence and chromatin signal,
-    Then save in **TFReocrd** format
+    Given coordinates dataframe, extract the sequence and chromatin signal, save in webdataset format
+
+    :param coords: pandas DataFrame containing genomic coordinates with columns **[chrom, start, end, label]**
+    :type coords: pandas DataFrame
+    :param genome_fasta: Genome fasta file.
+    :type genome_fasta: str
+    :param bigwig_filelist: A list of bigwig files containing track information (e.g., histone modifications)
+    :type bigwig_filelist: list of str or None
+    :param target_bam: bam file to get # reads in each region
+    :type target_bam: str or None
+    :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
+    :type transforms: dict of functions
+    :param outdir: output directory to save files in
+    :type outdir: str
+    :param outprefix: prefix of output files
+    :type outprefix: str
+    :param compress: whether to compress the output files
+    :type compress: boolean
+    :param numProcessors: number of processors
+    :type numProcessors: int
     """
 
     # split coordinates and assign chunks to workers
