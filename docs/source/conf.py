@@ -21,18 +21,16 @@ sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 from unittest import mock
 
 # Mock imports
-MOCK_MODULES = ["numpy",
-                "pandas",
-                "torch",
-                "torch.utils.data",
-                "pysam",
-                "pybedtools",
-                "pyfasta",
-                "pyBigWig",
-                "pytorch_lightning",
-                "webdataset"]
-for mod_name in MOCK_MODULES:
-    sys.modules[mod_name] = mock.Mock()
+autodoc_mock_imports = ["numpy",
+                        "pandas",
+                        "torch",
+                        "torch.utils.data",
+                        "pysam",
+                        "pybedtools",
+                        "pyfasta",
+                        "pyBigWig",
+                        "pytorch_lightning",
+                        "webdataset"]
 
 # -- Project information -----------------------------------------------------
 
