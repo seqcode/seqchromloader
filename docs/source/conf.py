@@ -24,6 +24,7 @@ from unittest import mock
 MOCK_MODULES = ["numpy",
                 "pandas",
                 "torch",
+                "torch.utils.data",
                 "pysam",
                 "pybedtools",
                 "pyfasta",
