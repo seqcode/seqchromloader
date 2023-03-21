@@ -27,4 +27,4 @@ or
 
 ## Usage
 
-For detailed usage, please refer to [documentation](https://seqchromloader.readthedocs.io/en/stable/)
+For detailed usage, please refer to [documentation](https://seqchromloader.readthedocs.io/en/latest/)
