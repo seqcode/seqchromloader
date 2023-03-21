@@ -24,3 +24,7 @@ or
 ### pip
 
 `pip install seqchromloader`
+
+## Usage
+
+For detailed usage, please refer to [documentation](https://seqchromloader.readthedocs.io/en/stable/)
