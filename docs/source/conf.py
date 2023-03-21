@@ -22,7 +22,7 @@ from unittest import mock
 
 # Mock imports
 MOCK_MODULES = ["numpy",
-                "pandas"
+                "pandas",
                 "torch",
                 "pysam",
                 "pybedtools",
