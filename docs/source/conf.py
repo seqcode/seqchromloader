@@ -20,8 +20,10 @@ sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 # import MOCK
 from unittest import mock
 
-# Mock open3d because it fails to build in readthedocs
-MOCK_MODULES = ["torch",
+# Mock imports
+MOCK_MODULES = ["numpy",
+                "pandas"
+                "torch",
                 "pysam",
                 "pybedtools",
                 "pyfasta",
