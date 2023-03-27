@@ -1,6 +1,8 @@
 import os
+import sys
+sys.path.insert(0, "./")
 import pandas as pd
-from seqchromloader import SeqChromDatasetByBed, SeqChromDatasetByWds, SeqChromDataModule
+from seqchromloader import SeqChromDatasetByDataFrame, SeqChromDatasetByBed, SeqChromDatasetByWds, SeqChromDataModule
 from seqchromloader import dump_data_webdataset
 
 import unittest
@@ -81,6 +83,22 @@ class Test(unittest.TestCase):
         self.assertEqual(seq[0,0,3].item(), 2.0)
         self.assertAlmostEqual(chrom[0,0,3].item(), 4.0/3)
         self.assertEqual(target[0].item(), 0.0)
+        self.assertEqual(label[1].item(), 1)
+    
+    def test_df_loader(self):
+        dataframe = pd.read_table("data/sample.bed", header=None, sep="\t", names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
+        it = iter(SeqChromDatasetByDataFrame(
+            dataframe=dataframe,
+            genome_fasta="data/sample.fa",
+            bigwig_filelist=["data/sample.bw"],
+            target_bam="data/sample.bam",
+            dataloader_kws={"batch_size":2,
+                            "shuffle":False}
+        ))
+        seq, chrom, target, label = next(it)
+        self.assertEqual(seq[1,0,4].item(), 1.0)
+        self.assertEqual(chrom[0,0,3].item(), 999.0)
+        self.assertEqual(target[0].item(), 2.0)
         self.assertEqual(label[1].item(), 1)
 
     def test_bed_loader(self):
