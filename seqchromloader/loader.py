@@ -93,10 +93,10 @@ class _SeqChromDatasetByWds(IterableDataset):
 
 SeqChromDatasetByWds = seqChromLoaderCurry(_SeqChromDatasetByWds)
 
-class _SeqChromDatasetByBed(Dataset):
+class _SeqChromDatasetByDataFrame(Dataset):
     """
-    :param bed: Bed file describing genomics regions to extract info from, every region has to be of the same length.
-    :type bed: str
+    :param dataframe: pandas dataframe describing genomics regions to extract info from, every region has to be of the same length.
+    :type dataframe: pd.DataFrame
     :param genome_fasta: Genome fasta file.
     :type genome_fasta: str
     :param bigwig_filelist: A list of bigwig files containing track information (e.g., histone modifications)
@@ -106,9 +106,15 @@ class _SeqChromDatasetByBed(Dataset):
     :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
     :type transforms: dict of functions
     """
-    def __init__(self, bed, genome_fasta, bigwig_filelist:list, target_bam=None, transforms:dict=None, initialize_first=False):
-        self.bed = pd.read_table(bed, header=None, names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
-
+    def __init__(self, 
+                 dataframe: pd.DataFrame, 
+                 genome_fasta: str, 
+                 bigwig_filelist:list, 
+                 target_bam=None, 
+                 transforms:dict=None, 
+                 initialize_first=False):
+        
+        self.dataframe = dataframe        
         self.genome_fasta = genome_fasta
         self.genome_pyfasta = None
         self.bigwig_filelist = bigwig_filelist
@@ -121,6 +127,7 @@ class _SeqChromDatasetByBed(Dataset):
         if initialize_first: self.initialize()
     
     def initialize(self):
+        # create the stream handler after child processes spawned to enable parallel reading
         # this function will be called by worker_init_function in DataLoader
         self.genome_pyfasta = pyfasta.Fasta(self.genome_fasta)
         self.bigwigs = [pyBigWig.open(bw) for bw in self.bigwig_filelist]
@@ -128,10 +135,10 @@ class _SeqChromDatasetByBed(Dataset):
             self.target_pysam = pysam.AlignmentFile(self.target_bam)
     
     def __len__(self):
-        return len(self.bed)
+        return len(self.dataframe)
 
     def __getitem__(self, idx):
-        item = self.bed.iloc[idx,]
+        item = self.dataframe.iloc[idx,]
         try:
             feature = utils.extract_info(
                 item.chrom,
@@ -148,6 +155,30 @@ class _SeqChromDatasetByBed(Dataset):
             raise e
 
         return feature['seq'], feature['chrom'], feature['target'], feature['label']
+    
+SeqChromDatasetByDataFrame = seqChromLoaderCurry(_SeqChromDatasetByDataFrame)
+
+class _SeqChromDatasetByBed(_SeqChromDatasetByDataFrame):
+    """
+    :param bed: Bed file describing genomics regions to extract info from, every region has to be of the same length.
+    :type bed: str
+    :param genome_fasta: Genome fasta file.
+    :type genome_fasta: str
+    :param bigwig_filelist: A list of bigwig files containing track information (e.g., histone modifications)
+    :type bigwig_filelist: list of str or None
+    :param target_bam: bam file to get # reads in each region
+    :type target_bam: str or None
+    :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
+    :type transforms: dict of functions
+    """
+    def __init__(self, bed: str, genome_fasta: str, bigwig_filelist:list, target_bam=None, transforms:dict=None, initialize_first=False):
+        dataframe = pd.read_table(bed, header=None, names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
+        super().__init__(dataframe,
+                         genome_fasta,
+                         bigwig_filelist,
+                         target_bam,
+                         transforms,
+                         initialize_first)
 
 SeqChromDatasetByBed = seqChromLoaderCurry(_SeqChromDatasetByBed)
 
