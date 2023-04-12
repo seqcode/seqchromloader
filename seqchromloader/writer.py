@@ -75,6 +75,8 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
     :type compress: boolean
     :param numProcessors: number of processors
     :type numProcessors: int
+    :param DALI: Set to True if you want to use the dataset for NVIDIA DALI, it would save all arrays in bytes, which results in losing the array shape info
+    :param DALI: boolean
     """
 
     # split coordinates and assign chunks to workers
@@ -90,10 +92,16 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                                                     target_bam=target_bam,
                                                     compress=compress,
                                                     outdir=outdir,
-                                                    transforms=transforms)
+                                                    transforms=transforms,
+                                                    DALI=DALI)
+    
+    count_of_digits = 0
+    while num_chunks > 0:
+       num_chunks = int(num_chunks/10)
+       count_of_digits += 1
 
     pool = Pool(numProcessors)
-    res = pool.starmap_async(dump_data_worker_freeze, zip(chunks, [outprefix + "_" + str(i) for i in range(num_chunks)]))
+    res = pool.starmap_async(dump_data_worker_freeze, zip(chunks, [outprefix + "_" + format(i, f'0{count_of_digits}d') for i in range(num_chunks)]))
     files = res.get()
 
     return files
@@ -105,7 +113,8 @@ def dump_data_webdataset_worker(coords,
                                 target_bam=None, 
                                 outdir="dataset/", 
                                 compress=True,
-                                transforms=None):
+                                transforms=None,
+                                DALI=False):
     # get handlers
     genome_pyfasta = pyfasta.Fasta(fasta)
     bigwigs = [pyBigWig.open(bw) for bw in bigwig_files]
@@ -132,11 +141,17 @@ def dump_data_webdataset_worker(coords,
             )
         except utils.BigWigInaccessible as e:
             continue
-
-        feature_dict["seq.npy"] = feature['seq']
-        feature_dict["chrom.npy"] = feature['chrom']
-        feature_dict["target.npy"] = feature['target']
-        feature_dict["label.npy"] = feature['label']
+        
+        if not DALI:
+            feature_dict["seq.npy"] = feature['seq']
+            feature_dict["chrom.npy"] = feature['chrom']
+            feature_dict["target.npy"] = feature['target']
+            feature_dict["label.npy"] = feature['label']
+        else:
+            feature_dict["seq.npy"] = feature['seq'].tobytes()
+            feature_dict["chrom.npy"] = feature['chrom'].tobytes()
+            feature_dict["target.npy"] = feature['target'].tobytes()
+            feature_dict["label.npy"] = feature['label'].tobytes()
 
         sink.write(feature_dict)
 
