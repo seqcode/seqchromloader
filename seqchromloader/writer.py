@@ -17,14 +17,43 @@ import pysam
 import pyBigWig
 import webdataset as wds
 
-from seqchromloader import utils
+from . import utils
+from .loader import _SeqChromDatasetByWds
 
+def convert_data_webdataset(wds_in, wds_out, transforms=None, compress=False):
+    """
+    Transform the provided webdataset
+    
+    :param wds_in: input webdataset file
+    :type wds_in: string
+    :param wds_out: output webdataset file
+    :type wds_out: string
+    :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
+    :type transforms: dict of functions
+    :param compress: whether to compress the output file
+    :type compress: boolean
+    """
+    
+    ds = _SeqChromDatasetByWds(wds_in, transforms=transforms, keep_key=True)
+    sink = wds.TarWriter(wds_out, compress=compress)
+    for (key, seq, chrom, target, label) in ds:
+        feature_dict = defaultdict()
+        feature_dict["__key__"] = key
+        
+        feature_dict["seq.npy"] = seq
+        feature_dict["chrom.npy"] = chrom
+        feature_dict["target.npy"] = target
+        feature_dict["label.npy"] = label
+        sink.write(feature_dict)
+    sink.close()
+    
 def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                         target_bam=None, 
                         outdir="dataset/", outprefix="seqchrom", 
                         compress=True, 
                         numProcessors=1,
-                        transforms=None):
+                        transforms=None,
+                        DALI=False):
     """
     Given coordinates dataframe, extract the sequence and chromatin signal, save in webdataset format
 

@@ -57,12 +57,13 @@ class _SeqChromDatasetByWds(IterableDataset):
     :param transforms: A dictionary of functions to transform the output data, accepted keys are **["seq", "chrom", "target", "label"]**
     :type transforms: dict of functions
     """
-    def __init__(self, wds, transforms:dict=None, rank=0, world_size=1):
+    def __init__(self, wds, transforms:dict=None, rank=0, world_size=1, keep_key=False):
         self.wds = wds
         self.transforms = transforms
 
         self.rank = rank
         self.world_size = world_size
+        self.keep_key = keep_key
 
     def initialize(self):
         # this function will be called by worker_init_function in DataLoader
@@ -85,7 +86,10 @@ class _SeqChromDatasetByWds(IterableDataset):
         if self.transforms is not None: 
             pipeline.append(wds.map_dict(**self.transforms))
 
-        pipeline.append(wds.to_tuple("seq", "chrom", "target", "label"))
+        if self.keep_key:
+            pipeline.append(wds.to_tuple("__key__", "seq", "chrom", "target", "label"))
+        else:
+            pipeline.append(wds.to_tuple("seq", "chrom", "target", "label"))
             
         ds = wds.DataPipeline(*pipeline)
 
