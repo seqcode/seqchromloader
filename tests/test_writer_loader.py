@@ -3,7 +3,7 @@ import sys
 sys.path.insert(0, "./")
 import pandas as pd
 from seqchromloader import SeqChromDatasetByDataFrame, SeqChromDatasetByBed, SeqChromDatasetByWds, SeqChromDataModule
-from seqchromloader import dump_data_webdataset
+from seqchromloader import dump_data_webdataset, convert_data_webdataset
 
 import unittest
 import tempfile
@@ -77,6 +77,20 @@ class Test(unittest.TestCase):
                   transforms={"seq": test_seq_transform,
                               "chrom": test_chrom_transform,
                               "target": test_target_transform},
+                  dataloader_kws={"batch_size":3}))
+        seq, chrom, target, label = next(it)
+
+        self.assertEqual(seq[0,0,3].item(), 2.0)
+        self.assertAlmostEqual(chrom[0,0,3].item(), 4.0/3)
+        self.assertEqual(target[0].item(), 0.0)
+        self.assertEqual(label[1].item(), 1)
+    
+    def test_wds_convert_loader(self):
+        convert_data_webdataset("data/test_0.tar.gz", "test_0_convert.tar.gz",
+                                        transforms={"seq": test_seq_transform,
+                                                    "chrom": test_chrom_transform,
+                                                    "target": test_target_transform})
+        it = iter(SeqChromDatasetByWds(["test_0_convert.tar.gz"],
                   dataloader_kws={"batch_size":3}))
         seq, chrom, target, label = next(it)
 
