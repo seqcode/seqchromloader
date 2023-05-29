@@ -42,6 +42,8 @@ The returned ``wds_file_lists`` contain the output file paths, every file has ~7
 
 One thing worth noting is the ``transforms`` parameter here, ``transforms`` accepts a dictionary of function, each function will be called on the output that its key refers to. In this example, the add 1 lambda function was called on each ``chrom`` tensor, you can do more complicated transformations in this way, e.g., standardize the tensor.
 
+.. autofunction:: seqchromloader.dump_data_webdataset
+
 Loader
 ------
 
@@ -72,11 +74,18 @@ A more straightforward way is using ``seqchromloader.SeqChromDatasetByBed``, whi
 
 Here I pass a dictionary describing the keywords arguments would be further passed to ``torch.utils.data.DataLoader`` to increase the number of workers (default is 1), you can refer to `Pytorch DataLoader Document <https://pytorch.org/docs/stable/data.html>`_ to explore more controls on DataLoader behavior
 
-API
----
-
-.. autofunction:: seqchromloader.dump_data_webdataset
-
 .. autofunction:: seqchromloader.SeqChromDatasetByBed
 
 .. autofunction:: seqchromloader.SeqChromDatasetByWds
+
+Utilities
+---------
+
+Utility functions for easily manipulating the genomic coordinates to generate training dataset
+
+.. autofunction:: seqchromloader.filter_chromosomes
+.. autofunction:: seqchromloader.make_random_shift
+.. autofunction:: seqchromloader.make_flank
+.. autofunction:: seqchromloader.chop_genome
+.. autofunction:: seqchromloader.dna2OneHot
+.. autofunction:: seqchromloader.rev_comp
