@@ -53,6 +53,7 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                         compress=True, 
                         numProcessors=1,
                         transforms=None,
+                        braceexpand=True,
                         DALI=False):
     """
     Given coordinates dataframe, extract the sequence and chromatin signal, save in webdataset format
@@ -75,6 +76,8 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
     :type compress: boolean
     :param numProcessors: number of processors
     :type numProcessors: int
+    :param braceexpand: if use brace to simplify the wds file list into a string
+    :param braceexpand: boolean
     :param DALI: Set to True if you want to use the dataset for NVIDIA DALI, it would save all arrays in bytes, which results in losing the array shape info
     :param DALI: boolean
     """
@@ -103,8 +106,13 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
     pool = Pool(numProcessors)
     res = pool.starmap_async(dump_data_worker_freeze, zip(chunks, [outprefix + "_" + format(i, f'0{count_of_digits}d') for i in range(num_chunks)]))
     files = res.get()
-
-    return files
+    
+    if braceexpand:
+        begin = f'0{count_of_digits}d'.format(0)
+        end = f'0{count_of_digits}d'.format(range(num_chunks)[-1])
+        return f"outprefix_{{{begin}...{end}}}.tar.gz" if compress else f"outprefix_{{{begin}...{end}}}.tar"
+    else:
+        return files
 
 def dump_data_webdataset_worker(coords, 
                                 outprefix, 
