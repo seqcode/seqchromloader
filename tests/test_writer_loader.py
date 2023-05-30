@@ -1,15 +1,18 @@
 import os
 import sys
 sys.path.insert(0, "./")
+import numpy as np
 import pandas as pd
 from seqchromloader import SeqChromDatasetByDataFrame, SeqChromDatasetByBed, SeqChromDatasetByWds, SeqChromDataModule
 from seqchromloader import dump_data_webdataset, convert_data_webdataset
+from seqchromloader import get_genome_sizes, make_random_shift, make_flank, random_coords, chop_genome
 
 import unittest
 import tempfile
 import shutil
 import pathlib as pl
 import webdataset as wds
+from pybedtools import BedTool
 
 class Test(unittest.TestCase):
     def setUp(self) -> None:
@@ -29,6 +32,55 @@ class Test(unittest.TestCase):
     def assertIsFile(self, path):
         if not pl.Path(path).resolve().is_file():
             raise AssertionError("File does not exist: %s" % str(path))
+        
+    def test_get_genome_sizes(self):
+        genome_sizes_nochr10=get_genome_sizes(genome="mm10", to_filter=["chr10"])
+        genome_sizes_chr19chr11=get_genome_sizes(genome="mm10", to_keep=["chr19", "chr11"])
+        
+        self.assertFalse(np.any(genome_sizes_nochr10.chrom.unique()=="chr10"))
+        self.assertTrue([i in ["chr11", "chr19"] for i in genome_sizes_chr19chr11.chrom.unique()])
+        
+    def test_make_random_shift(self):
+        coords = pd.DataFrame({
+            'chrom': ["chr1", "chr2"],
+            'start': [30, 100],
+            'end':[50, 150]
+        })
+        for i in range(1000):
+            shifted_window = make_random_shift(coords=coords, L=10)
+            self.assertTrue(max(abs((shifted_window.start + shifted_window.end)/2 - (coords.start + coords.end)/2)) <=5)
+            self.assertTrue(np.all((shifted_window.end-shifted_window.start) == 10))
+        
+    def test_make_flank(self):
+        coords = pd.DataFrame({
+            'chrom': ["chr1", "chr2"],
+            'start': [30, 100],
+            'end':[50, 150]
+        })
+        coords_flank = make_flank(coords, L=20, d=30)
+        self.assertTrue(np.all(coords_flank.start == [60, 145]))
+        self.assertTrue(np.all(coords_flank.end == [80, 165]))
+        
+    def test_random_coords(self):
+        interval = BedTool().from_dataframe(pd.DataFrame({'chrom': ['chr1', 'chr3'],
+                                                      'start': [0, 500],
+                                                      'end': [50000, 20000]}))
+        coords_incl = random_coords(genome="mm10", incl=interval)
+        coords_excl = random_coords(genome="mm10", excl=interval)
+        
+        self.assertTrue(BedTool().from_dataframe(coords_incl).intersect(interval).count()==coords_incl.size)
+        self.assertTrue(BedTool().from_dataframe(coords_excl).intersect(interval).count()==0)
+        
+    def test_chop_genome(self):
+        interval = BedTool().from_dataframe(pd.DataFrame({'chrom': ['chr2', 'chr12'],
+                                                      'start': [0, 500],
+                                                      'end': [50000, 20000]}))
+        coords_incl = chop_genome(chroms=["chr2", "chr12"], genome="mm10", stride=1000, l=500, incl=interval)
+        coords_excl = chop_genome(chroms=["chr2", "chr12"], genome="mm10", stride=1000, l=500, excl=interval)
+        self.assertTrue(np.all([coords_incl.start.iloc[i] - coords_incl.start.iloc[i-1] for i in range(1, len(coords_incl))]==1000))
+        self.assertTrue(np.all([coords_excl.start.iloc[i] - coords_excl.start.iloc[i-1] for i in range(1, len(coords_excl))]==1000))
+        self.assertTrue(BedTool().from_dataframe(coords_incl).intersect(interval).count()==coords_incl.size)
+        self.assertTrue(BedTool().from_dataframe(coords_excl).intersect(interval).count()==0)
 
     def test_writer(self):
         coords = pd.DataFrame({
