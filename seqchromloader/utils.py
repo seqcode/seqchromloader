@@ -9,11 +9,38 @@ from multiprocessing import Pool
 from pybedtools import Interval, BedTool
 from pybedtools.helpers import chromsizes
 
+def get_genome_sizes(gs=None, genome=None, to_filter=None, to_keep=None):
+    """
+    Loads the genome sizes file, filter or keep chromosomes
+    
+    :param gs: genome size file path, only one of `gs` and `genome` is required
+    :type gs: string
+    :param genome: genome build name, only one of `gs` and `genome` is required
+    :type genome: string
+    :param to_filter: list of chrmosomes to filter, mutually exclusive with `to_keep`
+    :type to_filter: list
+    :param to_keep: list of chromosomes to keep, mutually exclusive with `to_filter`
+    :type to_keep: list
+    """
+    
+    if gs:
+        genome_sizes = pd.read_table(gs, header=None, usecols=[0,1], names=['chrom', 'length'])
+    elif genome:
+        genome_sizes = (pd.DataFrame(chromsizes(genome))
+                        .T
+                        .rename(columns={0:"chrom", 1:"len"}))
+    else:
+        raise Exception("Either gs or genome should be provided!")
+
+    genome_sizes_filt = filter_chromosomes(genome_sizes, to_filter=to_filter, to_keep=to_keep)
+
+    return genome_sizes_filt
+
 def filter_chromosomes(coords, to_filter=None, to_keep=None):
     """
     Filter or keep the specified chromosomes
     
-    :param coords: input coordinate dataframe, first 3 columns are: [chrom, start, end]
+    :param coords: input coordinate dataframe, first column should be `chrom`
     :type coords: pandas.DataFrame
     :param to_filter: list of chrmosomes to filter, mutually exclusive with `to_keep`
     :type to_filter: list
@@ -68,7 +95,7 @@ def make_random_shift(coords, L, buffer=25):
     
     """
     low = int(-L/2 + buffer)
-    high = int(L/2 - buffer)
+    high = int(L/2 - buffer + 1)
 
     return (coords.assign(midpoint=lambda x: (x["start"]+x["end"])/2)
             .astype({"midpoint": int})
@@ -96,8 +123,44 @@ def make_flank(coords, L, d):
                 .apply(lambda s: pd.Series([s["chrom"], int(s["midpoint"]-L/2), int(s["midpoint"]+L/2)],
                                             index=["chrom", "start", "end"]), axis=1))
 
+    
+def random_coords(gs:str=None, genome:str=None, incl:BedTool=None, excl:BedTool=None, l=500, n=1000):
+    """
+    Randomly sample n intervals of length l from the genome,
+    shuffle to make all intervals inside the desired regions 
+    and outside exclusion regions
+    
+    :param gs: genome size file path, only one of `gs` and `genome` is required
+    :type gs: string
+    :param genome: genome build name, only one of `gs` and `genome` is required
+    :type genome: string
+    :param excl: regions that chopped regions should overlap with
+    :type incl: BedTool object
+    :param incl: regions that chopped regions shouldn't overlap with
+    :type excl: BedTool object
+    :param l: random interval size
+    :type l: integer
+    :param n: number of random intervals generated
+    :type n: integer
+    """
+    random_kwargs = {}
+    shuffle_kwargs = {}
+    if genome:
+        random_kwargs.update({"genome": genome}); shuffle_kwargs.update({"genome": genome})
+    elif gs:
+        random_kwargs.update({"g": gs}); shuffle_kwargs.update({"g": gs})
+    else:
+        raise Exception("Either gs or genome should be provided!")
+    
+    if incl: shuffle_kwargs.update({"incl": incl})
+    if excl: shuffle_kwargs.update({"excl": excl})
+    
+    return (BedTool()
+            .random(l=l, n=n, **random_kwargs)
+            .shuffle(**shuffle_kwargs)
+            .to_dataframe()[["chrom", "start", "end"]])
 
-def chop_genome(chroms:list=None, excl:BedTool=None, gs=None, genome=None, stride=500, l=500):
+def chop_genome(chroms:list=None, incl:BedTool=None, excl:BedTool=None, gs=None, genome=None, stride=500, l=500):
     """
     Given a genome size file and chromosome list,
     chop these chromosomes into intervals of length l,
@@ -105,7 +168,9 @@ def chop_genome(chroms:list=None, excl:BedTool=None, gs=None, genome=None, strid
     
     :param chroms: list of chromosomes to be chopped
     :type chroms: list of strings
-    :param excl: regions that chopped regions shouldn't overlap with
+    :param excl: regions that chopped regions should overlap with
+    :type incl: BedTool object
+    :param incl: regions that chopped regions shouldn't overlap with
     :type excl: BedTool object
     :param gs: genome size file path, only one of `gs` and `genome` is required
     :type gs: string
@@ -127,22 +192,16 @@ def chop_genome(chroms:list=None, excl:BedTool=None, gs=None, genome=None, strid
             start += stride
         return pd.DataFrame(intervals, columns=["chrom", "start", "end"])
     
-    if genome:
-        genome_sizes = (pd.DataFrame(chromsizes(genome))
-                        .T
-                        .rename(columns={0:"chrom", 1:"len"})
-                        .set_index("chrom")
-                        .loc[chroms])
-    elif gs:
-        genome_sizes = (pd.read_csv(gs, sep="\t", usecols=[0,1], names=["chrom", "len"])
-                        .set_index("chrom")
-                        .loc[chroms])
+    genome_sizes = get_genome_sizes(gs=gs, genome=genome, to_keep=chroms)
+    
     genome_chops = pd.concat([intervals_loop(i.Index, 0, stride, l, i.len) 
                                 for i in genome_sizes.itertuples()])
     genome_chops_bdt = BedTool.from_dataframe(genome_chops)
+    
+    if incl: genome_chops_bdt = genome_chops_bdt.intersect(incl, wa=True)
+    if excl: genome_chops_bdt = genome_chops_bdt.intersect(excl, v=True)
 
-    return (genome_chops_bdt.intersect(excl, v=True)
-                            .to_dataframe()[["chrom", "start", "end"]])
+    return genome_chops_bdt.to_dataframe()[["chrom", "start", "end"]]
 
 class DNA2OneHot(object):
     def __init__(self):
