@@ -111,7 +111,7 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
     if braceexpand:
         begin = format(0, f'0{count_of_digits}d')
         end = format(range(num_chunks)[-1], f'0{count_of_digits}d')
-        return os.path.join(outdir, f"{outprefix}_{{{begin}..{end}}}.tar.gz" if compress else f"{outprefix}_{{{begin}...{end}}}.tar")
+        return os.path.join(outdir, f"{outprefix}_{{{begin}..{end}}}.tar.gz" if compress else f"{outprefix}_{{{begin}..{end}}}.tar")
     else:
         return files
 
