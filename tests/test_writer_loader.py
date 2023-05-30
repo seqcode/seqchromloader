@@ -1,6 +1,5 @@
 import os
 import sys
-sys.path.insert(0, "./")
 import numpy as np
 import pandas as pd
 from seqchromloader import SeqChromDatasetByDataFrame, SeqChromDatasetByBed, SeqChromDatasetByWds, SeqChromDataModule
@@ -68,7 +67,7 @@ class Test(unittest.TestCase):
         coords_incl = random_coords(genome="mm10", incl=interval)
         coords_excl = random_coords(genome="mm10", excl=interval)
         
-        self.assertTrue(BedTool().from_dataframe(coords_incl).intersect(interval).count()==coords_incl.size)
+        self.assertTrue(BedTool().from_dataframe(coords_incl).intersect(interval).count()==len(coords_incl))
         self.assertTrue(BedTool().from_dataframe(coords_excl).intersect(interval).count()==0)
         
     def test_chop_genome(self):
@@ -77,9 +76,10 @@ class Test(unittest.TestCase):
                                                       'end': [50000, 20000]}))
         coords_incl = chop_genome(chroms=["chr2", "chr12"], genome="mm10", stride=1000, l=500, incl=interval)
         coords_excl = chop_genome(chroms=["chr2", "chr12"], genome="mm10", stride=1000, l=500, excl=interval)
-        self.assertTrue(np.all([coords_incl.start.iloc[i] - coords_incl.start.iloc[i-1] for i in range(1, len(coords_incl))]==1000))
-        self.assertTrue(np.all([coords_excl.start.iloc[i] - coords_excl.start.iloc[i-1] for i in range(1, len(coords_excl))]==1000))
-        self.assertTrue(BedTool().from_dataframe(coords_incl).intersect(interval).count()==coords_incl.size)
+        for c in ['chr2', 'chr12']:
+            df = coords_incl[coords_incl.chrom==c]
+            self.assertTrue(np.all([df.start.iloc[i] - df.start.iloc[i-1] == 1000 for i in range(1, len(df))]))
+        self.assertTrue(BedTool().from_dataframe(coords_incl).intersect(interval).count()==len(coords_incl))
         self.assertTrue(BedTool().from_dataframe(coords_excl).intersect(interval).count()==0)
 
     def test_writer(self):
@@ -99,8 +99,18 @@ class Test(unittest.TestCase):
                     outdir=self.tempdir,
                     outprefix='test',
                     compress=True,
-                    numProcessors=5)
+                    numProcessors=2)
         self.assertIsFile(os.path.join(self.tempdir, "test_0.tar.gz"))
+        wds_files = dump_data_webdataset(huge_coords, 
+                    genome_fasta='data/sample.fa', 
+                    bigwig_filelist=['data/sample.bw'],
+                    target_bam='data/sample.bam',
+                    outdir=self.tempdir,
+                    outprefix='test',
+                    compress=True,
+                    numProcessors=2,
+                    braceexpand=True)
+        self.assertTrue(wds_files == os.path.join(self.tempdir, "test_{0..1}.tar.gz"))
 
         ds = wds.DataPipeline(
             wds.SimpleShardList([os.path.join(self.tempdir, "test_0.tar.gz")]),
@@ -251,4 +261,4 @@ def test_target_transform(target):
     return target * 3
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=2)

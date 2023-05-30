@@ -28,7 +28,9 @@ def get_genome_sizes(gs=None, genome=None, to_filter=None, to_keep=None):
     elif genome:
         genome_sizes = (pd.DataFrame(chromsizes(genome))
                         .T
-                        .rename(columns={0:"chrom", 1:"len"}))
+                        .reset_index()
+                        .rename(columns={"index":"chrom", 0:"start", 1:"end"})
+                        .assign(length=lambda x: x["end"] - x["start"]))[["chrom", "length"]]
     else:
         raise Exception("Either gs or genome should be provided!")
 
@@ -74,7 +76,7 @@ def filter_chromosomes(coords, to_filter=None, to_keep=None):
         corods_out = coords
     return corods_out
 
-def make_random_shift(coords, L, buffer=25):
+def make_random_shift(coords, L, buffer=0):
     """
     This function takes as input a set of bed coordinates dataframe 
     It finds the mid-point for each record or Interval in the bed file,
@@ -152,8 +154,8 @@ def random_coords(gs:str=None, genome:str=None, incl:BedTool=None, excl:BedTool=
     else:
         raise Exception("Either gs or genome should be provided!")
     
-    if incl: shuffle_kwargs.update({"incl": incl})
-    if excl: shuffle_kwargs.update({"excl": excl})
+    if incl: shuffle_kwargs.update({"incl": incl.fn})
+    if excl: shuffle_kwargs.update({"excl": excl.fn})
     
     return (BedTool()
             .random(l=l, n=n, **random_kwargs)
@@ -194,7 +196,7 @@ def chop_genome(chroms:list=None, incl:BedTool=None, excl:BedTool=None, gs=None,
     
     genome_sizes = get_genome_sizes(gs=gs, genome=genome, to_keep=chroms)
     
-    genome_chops = pd.concat([intervals_loop(i.Index, 0, stride, l, i.len) 
+    genome_chops = pd.concat([intervals_loop(i.chrom, 0, stride, l, i.length) 
                                 for i in genome_sizes.itertuples()])
     genome_chops_bdt = BedTool.from_dataframe(genome_chops)
     
@@ -282,8 +284,8 @@ class BigWigInaccessible(Exception):
     def __str__(self) -> str:
         return f'Chromatin Info Inaccessible in region {self.chrom}:{self.start}-{self.end}'
 
-def extract_info(chrom, start, end, label, genome_pyfasta, bigwigs, target_bam, strand="+", transforms:dict=None):
-    seq = genome_pyfasta[chrom][int(start):int(end)]
+def extract_info(chrom, start, end, label, genome_pyfaidx, bigwigs, target_bam, strand="+", transforms:dict=None):
+    seq = genome_pyfaidx[chrom][int(start):int(end)].seq
     if strand=="-":
         seq = rev_comp(seq)
     seq_array = dna2OneHot(seq)

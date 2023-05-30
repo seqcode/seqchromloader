@@ -12,7 +12,7 @@ import logging
 from collections import defaultdict
 from multiprocessing import Pool
 
-import pyfasta
+import pyfaidx
 import pysam
 import pyBigWig
 import webdataset as wds
@@ -53,7 +53,7 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                         compress=True, 
                         numProcessors=1,
                         transforms=None,
-                        braceexpand=True,
+                        braceexpand=False,
                         DALI=False):
     """
     Given coordinates dataframe, extract the sequence and chromatin signal, save in webdataset format
@@ -85,7 +85,7 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
     # split coordinates and assign chunks to workers
     num_chunks = math.ceil(len(coords) / 7000)
     chunks = np.array_split(coords, num_chunks)
-
+    
     # freeze the common parameters
     ## create a scaler to get statistics for normalizing chromatin marks input
     ## also create a multiprocessing lock
@@ -99,8 +99,9 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                                                     DALI=DALI)
     
     count_of_digits = 0
-    while num_chunks > 0:
-       num_chunks = int(num_chunks/10)
+    nc = num_chunks
+    while nc > 0:
+       nc = int(nc/10)
        count_of_digits += 1
 
     pool = Pool(numProcessors)
@@ -108,9 +109,9 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
     files = res.get()
     
     if braceexpand:
-        begin = f'0{count_of_digits}d'.format(0)
-        end = f'0{count_of_digits}d'.format(range(num_chunks)[-1])
-        return f"outprefix_{{{begin}...{end}}}.tar.gz" if compress else f"outprefix_{{{begin}...{end}}}.tar"
+        begin = format(0, f'0{count_of_digits}d')
+        end = format(range(num_chunks)[-1], f'0{count_of_digits}d')
+        return os.path.join(outdir, f"{outprefix}_{{{begin}..{end}}}.tar.gz" if compress else f"{outprefix}_{{{begin}...{end}}}.tar")
     else:
         return files
 
@@ -124,7 +125,7 @@ def dump_data_webdataset_worker(coords,
                                 transforms=None,
                                 DALI=False):
     # get handlers
-    genome_pyfasta = pyfasta.Fasta(fasta)
+    genome_pyfaidx = pyfaidx.Fasta(fasta)
     bigwigs = [pyBigWig.open(bw) for bw in bigwig_files]
     target_pysam = pysam.AlignmentFile(target_bam) if target_bam is not None else None
 
@@ -141,7 +142,7 @@ def dump_data_webdataset_worker(coords,
                 item.start,
                 item.end,
                 item.label,
-                genome_pyfasta=genome_pyfasta,
+                genome_pyfaidx=genome_pyfaidx,
                 bigwigs=bigwigs,
                 target_bam=target_pysam,
                 strand=item.strand,

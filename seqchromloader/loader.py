@@ -8,7 +8,7 @@ import logging
 import torch
 import random
 import pysam
-import pyfasta
+import pyfaidx
 import pyBigWig
 import numpy as np
 import pandas as pd
@@ -120,7 +120,7 @@ class _SeqChromDatasetByDataFrame(Dataset):
         
         self.dataframe = dataframe        
         self.genome_fasta = genome_fasta
-        self.genome_pyfasta = None
+        self.genome_pyfaidx = None
         self.bigwig_filelist = bigwig_filelist
         self.bigwigs = None
         self.target_bam = target_bam
@@ -133,7 +133,7 @@ class _SeqChromDatasetByDataFrame(Dataset):
     def initialize(self):
         # create the stream handler after child processes spawned to enable parallel reading
         # this function will be called by worker_init_function in DataLoader
-        self.genome_pyfasta = pyfasta.Fasta(self.genome_fasta)
+        self.genome_pyfaidx = pyfaidx.Fasta(self.genome_fasta)
         self.bigwigs = [pyBigWig.open(bw) for bw in self.bigwig_filelist]
         if self.target_bam is not None:
             self.target_pysam = pysam.AlignmentFile(self.target_bam)
@@ -149,7 +149,7 @@ class _SeqChromDatasetByDataFrame(Dataset):
                 item.start,
                 item.end,
                 item.label,
-                genome_pyfasta=self.genome_pyfasta,
+                genome_pyfaidx=self.genome_pyfaidx,
                 bigwigs=self.bigwigs,
                 target_bam=self.target_pysam,
                 strand=item.strand,
