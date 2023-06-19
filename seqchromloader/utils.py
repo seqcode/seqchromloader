@@ -2,9 +2,11 @@
 Utilities for iterating constructing data sets and iterating over
 DNA sequence data.
 """
+import math
 import pandas as pd
 import numpy as np
 import logging
+import pyBigWig
 from multiprocessing import Pool
 from pybedtools import Interval, BedTool
 from pybedtools.helpers import chromsizes
@@ -204,6 +206,45 @@ def chop_genome(chroms:list=None, incl:BedTool=None, excl:BedTool=None, gs=None,
     if excl: genome_chops_bdt = genome_chops_bdt.intersect(excl, v=True)
 
     return genome_chops_bdt.to_dataframe()[["chrom", "start", "end"]]
+
+def compute_mean_std_bigwig(bigwig):
+    """
+    
+    Compute the overall mean and standard deviation of a given bigwig file
+
+    :param bigwig: bigwig file path
+    :type bigwig: str
+    :rtype: (mean, stddev)
+    """
+    bw = pyBigWig.open(bigwig)
+    
+    # get chrom length list
+    chroms = bw.chroms()
+    
+    # iterate chrom list to get mean and std
+    ns = []; means = []; stds = []
+    for chrom, length in chroms.items():
+        # iterate all intervals to get the covered length
+        length = sum([i[1]-i[0] for i in bw.intervals(chrom)])
+        ns.append(length)
+        means.append(bw.stats(chrom, type="mean", exact=True)[0])
+        try:
+            stds.append(bw.stats(chrom, type="std", exact=True)[0])
+        except RuntimeError:
+            print(chrom)
+            print(length)
+            raise Exception
+    
+    # compute overall metrics
+    std_all = 0
+    ns_sum = sum(ns); mean_all = sum([n*means[i] for i, n in enumerate(ns)])/ns_sum
+    for i, n in enumerate(ns):
+        std_all += n* math.pow(means[i]- mean_all, 2)
+        std_all += n* math.pow(stds[i], 2)
+    std_all /= ns_sum
+    std_all = math.sqrt(std_all)
+    
+    return mean_all, std_all
 
 class DNA2OneHot(object):
     def __init__(self):
