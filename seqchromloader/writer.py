@@ -48,7 +48,8 @@ def convert_data_webdataset(wds_in, wds_out, transforms=None, compress=False):
     sink.close()
     
 def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
-                        target_bam=None, 
+                        target_bam=None,
+                        target_bw=None, 
                         outdir="dataset/", outprefix="seqchrom", 
                         compress=True, 
                         numProcessors=1,
@@ -64,8 +65,10 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
     :type genome_fasta: str
     :param bigwig_filelist: A list of bigwig files containing track information (e.g., histone modifications)
     :type bigwig_filelist: list of str or None
-    :param target_bam: bam file to get # reads in each region
+    :param target_bam: bam file to get # reads in each region, mutually exclusive with `target_bw`
     :type target_bam: str or None
+    :param target_bw: bigwig file to get # reads in each region, mutually exclusive with `target_bam`
+    :type target_bw: str or None
     :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
     :type transforms: dict of functions
     :param outdir: output directory to save files in
@@ -81,6 +84,9 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
     :param DALI: Set to True if you want to use the dataset for NVIDIA DALI, it would save all arrays in bytes, which results in losing the array shape info
     :param DALI: boolean
     """
+    # check parameters
+    if (target_bam is not None and target_bw is not None):
+        raise Exception("Only one of target_bam and target_bw should be provided!")
 
     # split coordinates and assign chunks to workers
     num_chunks = math.ceil(len(coords) / 7000)
@@ -93,6 +99,7 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                                                     fasta=genome_fasta, 
                                                     bigwig_files=bigwig_filelist,
                                                     target_bam=target_bam,
+                                                    target_bw=target_bw,
                                                     compress=compress,
                                                     outdir=outdir,
                                                     transforms=transforms,
@@ -119,7 +126,8 @@ def dump_data_webdataset_worker(coords,
                                 outprefix, 
                                 fasta, 
                                 bigwig_files,
-                                target_bam=None, 
+                                target_bam=None,
+                                target_bw=None,
                                 outdir="dataset/", 
                                 compress=True,
                                 transforms=None,
@@ -127,7 +135,12 @@ def dump_data_webdataset_worker(coords,
     # get handlers
     genome_pyfaidx = pyfaidx.Fasta(fasta)
     bigwigs = [pyBigWig.open(bw) for bw in bigwig_files]
-    target_pysam = pysam.AlignmentFile(target_bam) if target_bam is not None else None
+    if target_bam is not None:
+        target = pysam.AlignmentFile(target_bam)
+    elif target_bw is not None:
+        target = pyBigWig.open(target_bw)
+    else:
+        target = None
 
     # iterate all records
     filename = os.path.join(outdir, f"{outprefix}.tar.gz" if compress else f"{outprefix}.tar")
@@ -144,7 +157,7 @@ def dump_data_webdataset_worker(coords,
                 item.label,
                 genome_pyfaidx=genome_pyfaidx,
                 bigwigs=bigwigs,
-                target_bam=target_pysam,
+                target=target,
                 strand=item.strand,
                 transforms=transforms,
             )

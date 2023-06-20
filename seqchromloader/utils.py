@@ -6,6 +6,7 @@ import math
 import pandas as pd
 import numpy as np
 import logging
+import pysam
 import pyBigWig
 from multiprocessing import Pool
 from pybedtools import Interval, BedTool
@@ -324,34 +325,54 @@ class BigWigInaccessible(Exception):
 
     def __str__(self) -> str:
         return f'Chromatin Info Inaccessible in region {self.chrom}:{self.start}-{self.end}'
+    
+def extract_bw(chrom, start, end, bigwigs, strand="+"):
+    chroms_array = []
+    try:
+        for idx, bigwig in enumerate(bigwigs):
+            c = (np.nan_to_num(bigwig.values(chrom, start, end))).astype(np.float32)
+            if strand=="-":
+                c = c[::-1] 
+            chroms_array.append(c)
+    except RuntimeError as e:
+        logging.warning(e)
+        logging.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
+        raise BigWigInaccessible(chrom, start, end)
+    chroms_array = np.vstack(chroms_array)  # create the chromatin track array, shape (num_tracks, length)
+    
+    return chroms_array
 
-def extract_info(chrom, start, end, label, genome_pyfaidx, bigwigs, target_bam, strand="+", transforms:dict=None):
+def extract_dnaOneHot(chrom, start, end, strand, genome_pyfaidx):
     seq = genome_pyfaidx[chrom][int(start):int(end)].seq
     if strand=="-":
         seq = rev_comp(seq)
     seq_array = dna2OneHot(seq)
+    
+    return seq_array
+
+def extract_target(chrom, start, end, strand, target):
+    if isinstance(target, pysam.AlignmentFile):
+        target_array = np.array(target.count(chrom, start, end), dtype=np.float32)[np.newaxis]
+    elif isinstance(target, pyBigWig.pyBigWig):
+        target_array = np.nan_to_num(target.values(chrom, start, end)).astype(np.float32)
+        if strand=="-":
+            target_array = target_array[::-1]
+    else:
+        target_array = None
+    return target_array
+
+def extract_info(chrom, start, end, label, genome_pyfaidx, bigwigs, target, strand="+", transforms:dict=None):
+    seq_array = extract_dnaOneHot(chrom, start, end, strand, genome_pyfaidx)
 
     #chromatin track
-    chroms_array = []
     if bigwigs is not None and len(bigwigs)>0:
-        try:
-            for idx, bigwig in enumerate(bigwigs):
-                c = (np.nan_to_num(bigwig.values(chrom, start, end))).astype(np.float32)
-                if strand=="-":
-                    c = c[::-1] 
-                chroms_array.append(c)
-        except RuntimeError as e:
-            logging.warning(e)
-            logging.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
-            raise BigWigInaccessible(chrom, start, end)
-        chroms_array = np.vstack(chroms_array)  # create the chromatin track array, shape (num_tracks, length)
+        chroms_array = extract_bw(chrom, start, end, strand)
     else:
         chroms_array = None
     # label
     label_array = np.array(label, dtype=np.int32)[np.newaxis]
     # counts
-    target_array = target_bam.count(chrom, start, end) if target_bam is not None else np.nan
-    target_array = np.array(target_array, dtype=np.float32)[np.newaxis]
+    target_array = extract_target(chrom, start, end, strand, target)
 
     feature = {
         'seq': seq_array,
