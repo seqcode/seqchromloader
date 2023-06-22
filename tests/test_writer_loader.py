@@ -245,6 +245,23 @@ class Test(unittest.TestCase):
         self.assertEqual(target[0].item(), 6.0)
         self.assertEqual(label[1].item(), 1)
 
+    def test_bed_loader_return_region(self):
+
+        it = iter(SeqChromDatasetByBed(
+            bed="data/sample.bed",
+            genome_fasta="data/sample.fa",
+            bigwig_filelist=["data/sample.bw"],
+            target_bam="data/sample.bam",
+            transforms={"seq": test_seq_transform,
+                        "chrom": test_chrom_transform,
+                        "target": test_target_transform},
+            dataloader_kws={"batch_size":2,
+                            "shuffle":False},
+            return_region=True
+        ))
+        region, seq, chrom, target, label = next(it)
+        self.assertEqual(region[0], "chr19:0-5")
+
     def test_lightning_datamodule(self):
         dm = SeqChromDataModule(
             train_wds="data/test_0.tar.gz",
