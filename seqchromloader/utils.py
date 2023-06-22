@@ -326,7 +326,7 @@ class BigWigInaccessible(Exception):
     def __str__(self) -> str:
         return f'Chromatin Info Inaccessible in region {self.chrom}:{self.start}-{self.end}'
     
-def extract_bw(chrom, start, end, bigwigs, strand="+"):
+def extract_bw(chrom, start, end, strand, bigwigs):
     chroms_array = []
     try:
         for idx, bigwig in enumerate(bigwigs):
@@ -354,9 +354,14 @@ def extract_target(chrom, start, end, strand, target):
     if isinstance(target, pysam.AlignmentFile):
         target_array = np.array(target.count(chrom, start, end), dtype=np.float32)[np.newaxis]
     elif isinstance(target, pyBigWig.pyBigWig):
-        target_array = np.nan_to_num(target.values(chrom, start, end)).astype(np.float32)
-        if strand=="-":
-            target_array = target_array[::-1]
+        try:
+            target_array = np.nan_to_num(target.values(chrom, start, end)).astype(np.float32)
+            if strand=="-":
+                target_array = target_array[::-1]
+        except RuntimeError as e:
+            logging.warning(e)
+            logging.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
+            raise BigWigInaccessible(chrom, start, end)
     else:
         target_array = None
     return target_array
@@ -366,7 +371,7 @@ def extract_info(chrom, start, end, label, genome_pyfaidx, bigwigs, target, stra
 
     #chromatin track
     if bigwigs is not None and len(bigwigs)>0:
-        chroms_array = extract_bw(chrom, start, end, strand)
+        chroms_array = extract_bw(chrom, start, end, strand, bigwigs)
     else:
         chroms_array = None
     # label

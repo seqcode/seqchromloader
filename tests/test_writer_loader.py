@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+from functools import partial
 from seqchromloader import SeqChromDatasetByDataFrame, SeqChromDatasetByBed, SeqChromDatasetByWds, SeqChromDataModule
 from seqchromloader import dump_data_webdataset, convert_data_webdataset
 from seqchromloader import get_genome_sizes, make_random_shift, make_flank, random_coords, chop_genome
@@ -82,7 +83,7 @@ class Test(unittest.TestCase):
         self.assertTrue(BedTool().from_dataframe(coords_incl).intersect(interval).count()==len(coords_incl))
         self.assertTrue(BedTool().from_dataframe(coords_excl).intersect(interval).count()==0)
 
-    def test_writer(self):
+    def test_writer_target_bam(self):
         coords = pd.DataFrame({
             'chrom': ["chr19", "chr19"],
             'start': [0, 3],
@@ -125,6 +126,39 @@ class Test(unittest.TestCase):
         self.assertEqual(target[0].item(), 2.0)
         self.assertEqual(label[1].item(), 1)
     
+    def test_writer_target_bw(self):
+        coords = pd.DataFrame({
+            'chrom': ["chr19", "chr19"],
+            'start': [0, 3],
+            'end': [5, 8],
+            'label': [0, 1],
+            'score': [".", "."],
+            'strand': ["+", "+"]
+        })
+        huge_coords = pd.concat([coords] * 5000, axis=0).reset_index()
+        dump_data_webdataset(huge_coords, 
+                    genome_fasta='data/sample.fa', 
+                    bigwig_filelist=['data/sample.bw'],
+                    target_bw='data/sample.bw',
+                    outdir=self.tempdir,
+                    outprefix='test',
+                    compress=True,
+                    transforms={'target': partial(np.sum, keepdims=True)},
+                    numProcessors=2)
+        self.assertIsFile(os.path.join(self.tempdir, "test_0.tar.gz"))
+        ds = wds.DataPipeline(
+            wds.SimpleShardList([os.path.join(self.tempdir, "test_0.tar.gz")]),
+            wds.tarfile_to_samples(),
+            wds.decode(),
+            wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
+            wds.batched(2)
+        )
+        seq, chrom, target, label = next(iter(ds))
+        self.assertEqual(seq[1,0,4].item(), 1.0)
+        self.assertEqual(chrom[0,0,3].item(), 999.0)
+        self.assertEqual(target[0].item(), 999.0)
+        self.assertEqual(label[1].item(), 1)
+        
     def test_wds_loader(self):
         it = iter(SeqChromDatasetByWds(["data/test_0.tar.gz"], dataloader_kws={"batch_size":3}))
         seq, chrom, target, label = next(it)

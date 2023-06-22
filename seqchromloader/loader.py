@@ -151,7 +151,7 @@ class _SeqChromDatasetByDataFrame(Dataset):
                 item.label,
                 genome_pyfaidx=self.genome_pyfaidx,
                 bigwigs=self.bigwigs,
-                target_bam=self.target_pysam,
+                target=self.target_pysam,
                 strand=item.strand,
                 transforms=self.transforms
             )
