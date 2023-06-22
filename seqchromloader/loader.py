@@ -116,7 +116,8 @@ class _SeqChromDatasetByDataFrame(Dataset):
                  bigwig_filelist:list, 
                  target_bam=None, 
                  transforms:dict=None, 
-                 initialize_first=False):
+                 initialize_first=False,
+                 return_region=False):
         
         self.dataframe = dataframe        
         self.genome_fasta = genome_fasta
@@ -129,6 +130,8 @@ class _SeqChromDatasetByDataFrame(Dataset):
         self.transforms = transforms
 
         if initialize_first: self.initialize()
+
+        self.return_region = return_region
     
     def initialize(self):
         # create the stream handler after child processes spawned to enable parallel reading
@@ -158,7 +161,10 @@ class _SeqChromDatasetByDataFrame(Dataset):
         except utils.BigWigInaccessible as e:
             raise e
 
-        return feature['seq'], feature['chrom'], feature['target'], feature['label']
+        if not self.return_region:
+            return feature['seq'], feature['chrom'], feature['target'], feature['label']
+        else:
+            return f'{item.chrom}:{item.start}-{item.end}', feature['seq'], feature['chrom'], feature['target'], feature['label']
     
 SeqChromDatasetByDataFrame = seqChromLoaderCurry(_SeqChromDatasetByDataFrame)
 
@@ -175,14 +181,15 @@ class _SeqChromDatasetByBed(_SeqChromDatasetByDataFrame):
     :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
     :type transforms: dict of functions
     """
-    def __init__(self, bed: str, genome_fasta: str, bigwig_filelist:list, target_bam=None, transforms:dict=None, initialize_first=False):
+    def __init__(self, bed: str, genome_fasta: str, bigwig_filelist:list, target_bam=None, transforms:dict=None, initialize_first=False, return_region=False):
         dataframe = pd.read_table(bed, header=None, names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
         super().__init__(dataframe,
                          genome_fasta,
                          bigwig_filelist,
                          target_bam,
                          transforms,
-                         initialize_first)
+                         initialize_first,
+                         return_region)
 
 SeqChromDatasetByBed = seqChromLoaderCurry(_SeqChromDatasetByBed)
 
