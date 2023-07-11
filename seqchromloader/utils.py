@@ -79,7 +79,7 @@ def filter_chromosomes(coords, to_filter=None, to_keep=None):
         corods_out = coords
     return corods_out
 
-def make_random_shift(coords, L, buffer=0):
+def make_random_shift(coords, L, buffer=0, rng=None):
     """
     This function takes as input a set of bed coordinates dataframe 
     It finds the mid-point for each record or Interval in the bed file,
@@ -96,15 +96,19 @@ def make_random_shift(coords, L, buffer=0):
     :type L: integer
     :param buffer: buffer size
     :type buffer: integer
+    :param rng: random number generator from numpy, optional
+    :type rng: np.random.Generator
     :rtype: shifted coordinate dataframe
-    
     """
     low = int(-L/2 + buffer)
     high = int(L/2 - buffer + 1)
 
+    if rng is None:
+        rng = np.random.default_rng()
+
     return (coords.assign(midpoint=lambda x: (x["start"]+x["end"])/2)
             .astype({"midpoint": int})
-            .assign(midpoint=lambda x: x["midpoint"] + np.random.randint(low=low, high=high, size=len(coords)))
+            .assign(midpoint=lambda x: x["midpoint"] + rng.randint(low=low, high=high, size=len(coords)))
             .apply(lambda s: pd.Series([s["chrom"], int(s["midpoint"]-L/2), int(s["midpoint"]+L/2)],
                                         index=["chrom", "start", "end"]), axis=1))
 
@@ -129,7 +133,8 @@ def make_flank(coords, L, d):
                                             index=["chrom", "start", "end"]), axis=1))
 
     
-def random_coords(gs:str=None, genome:str=None, incl:BedTool=None, excl:BedTool=None, l=500, n=1000):
+def random_coords(gs:str=None, genome:str=None, incl:BedTool=None, excl:BedTool=None,
+                  l=500, n=1000, seed=1):
     """
     Randomly sample n intervals of length l from the genome,
     shuffle to make all intervals inside the desired regions 
@@ -161,8 +166,8 @@ def random_coords(gs:str=None, genome:str=None, incl:BedTool=None, excl:BedTool=
     if excl: shuffle_kwargs.update({"excl": excl.fn})
     
     return (BedTool()
-            .random(l=l, n=n, **random_kwargs)
-            .shuffle(**shuffle_kwargs)
+            .random(l=l, n=n, seed=seed, **random_kwargs)
+            .shuffle(seed=seed, **shuffle_kwargs)
             .to_dataframe()[["chrom", "start", "end"]])
 
 def chop_genome(chroms:list=None, incl:BedTool=None, excl:BedTool=None, gs=None, genome=None, stride=500, l=500):
