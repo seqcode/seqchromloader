@@ -108,7 +108,7 @@ def make_random_shift(coords, L, buffer=0, rng=None):
 
     return (coords.assign(midpoint=lambda x: (x["start"]+x["end"])/2)
             .astype({"midpoint": int})
-            .assign(midpoint=lambda x: x["midpoint"] + rng.randint(low=low, high=high, size=len(coords)))
+            .assign(midpoint=lambda x: x["midpoint"] + rng.integers(low=low, high=high, size=len(coords)))
             .apply(lambda s: pd.Series([s["chrom"], int(s["midpoint"]-L/2), int(s["midpoint"]+L/2)],
                                         index=["chrom", "start", "end"]), axis=1))
 
@@ -152,6 +152,8 @@ def random_coords(gs:str=None, genome:str=None, incl:BedTool=None, excl:BedTool=
     :type l: integer
     :param n: number of random intervals generated
     :type n: integer
+    :param seed: random seed
+    :type seed: integer
     """
     random_kwargs = {}
     shuffle_kwargs = {}
