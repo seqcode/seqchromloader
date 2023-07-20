@@ -370,7 +370,7 @@ def extract_target(chrom, start, end, strand, target):
             logging.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
             raise BigWigInaccessible(chrom, start, end)
     else:
-        target_array = np.array([None])
+        target_array = np.array([np.nan])
     return target_array
 
 def extract_info(chrom, start, end, label, genome_pyfaidx, bigwigs, target, strand="+", transforms:dict=None):
@@ -380,7 +380,7 @@ def extract_info(chrom, start, end, label, genome_pyfaidx, bigwigs, target, stra
     if bigwigs is not None and len(bigwigs)>0:
         chroms_array = extract_bw(chrom, start, end, strand, bigwigs)
     else:
-        chroms_array = np.array([None])
+        chroms_array = np.array([np.nan])
     # label
     label_array = np.array(label, dtype=np.int32)[np.newaxis]
     # counts
