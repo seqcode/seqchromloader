@@ -125,7 +125,7 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
 def dump_data_webdataset_worker(coords, 
                                 outprefix, 
                                 fasta, 
-                                bigwig_files,
+                                bigwig_files=None,
                                 target_bam=None,
                                 target_bw=None,
                                 outdir="dataset/", 
@@ -134,7 +134,7 @@ def dump_data_webdataset_worker(coords,
                                 DALI=False):
     # get handlers
     genome_pyfaidx = pyfaidx.Fasta(fasta)
-    bigwigs = [pyBigWig.open(bw) for bw in bigwig_files]
+    bigwigs = [pyBigWig.open(bw) for bw in bigwig_files] if bigwig_files is not None else None
     if target_bam is not None:
         target = pysam.AlignmentFile(target_bam)
     elif target_bw is not None:
@@ -178,6 +178,7 @@ def dump_data_webdataset_worker(coords,
         sink.write(feature_dict)
 
     sink.close()
-    for bw in bigwigs: bw.close()
+    if bigwigs is not None:
+        for bw in bigwigs: bw.close()
 
     return filename
