@@ -83,7 +83,7 @@ class Test(unittest.TestCase):
         self.assertTrue(BedTool().from_dataframe(coords_incl).intersect(interval).count()==len(coords_incl))
         self.assertTrue(BedTool().from_dataframe(coords_excl).intersect(interval).count()==0)
 
-    def test_writer_target_bam(self):
+    def test_write_load_target_bam(self):
         coords = pd.DataFrame({
             'chrom': ["chr19", "chr19"],
             'start': [0, 3],
@@ -126,7 +126,7 @@ class Test(unittest.TestCase):
         self.assertEqual(target[0].item(), 2.0)
         self.assertEqual(label[1].item(), 1)
     
-    def test_writer_target_bw(self):
+    def test_write_load_target_bw(self):
         coords = pd.DataFrame({
             'chrom': ["chr19", "chr19"],
             'start': [0, 3],
@@ -159,7 +159,7 @@ class Test(unittest.TestCase):
         self.assertEqual(target[0].item(), 999.0)
         self.assertEqual(label[1].item(), 1)
 
-    def test_write_chrom_target_none(self):
+    def test_write_load_chrom_target_none(self):
         coords = pd.DataFrame({
             'chrom': ["chr19", "chr19"],
             'start': [0, 3],
@@ -177,6 +177,15 @@ class Test(unittest.TestCase):
                     compress=True,
                     numProcessors=2)
         self.assertIsFile(os.path.join(self.tempdir, "test_target_none_0.tar.gz"))
+        ds = wds.DataPipeline(
+            wds.SimpleShardList([os.path.join(self.tempdir, "test_target_none_0.tar.gz")]),
+            wds.tarfile_to_samples(),
+            wds.decode(), wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
+            wds.batched(2)
+        )
+        seq, chrom, target, label = next(iter(ds))
+        self.assertEqual(seq[1,0,4].item(), 1.0)
+        self.assertEqual(label[1].item(), 1)
 
     def test_wds_loader(self):
         it = iter(SeqChromDatasetByWds(["data/test_0.tar.gz"], dataloader_kws={"batch_size":3}))
