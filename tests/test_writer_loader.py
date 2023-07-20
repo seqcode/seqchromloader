@@ -158,7 +158,26 @@ class Test(unittest.TestCase):
         self.assertEqual(chrom[0,0,3].item(), 999.0)
         self.assertEqual(target[0].item(), 999.0)
         self.assertEqual(label[1].item(), 1)
-        
+
+    def test_write_chrom_target_none(self):
+        coords = pd.DataFrame({
+            'chrom': ["chr19", "chr19"],
+            'start': [0, 3],
+            'end': [5, 8],
+            'label': [0, 1],
+            'score': [".", "."],
+            'strand': ["+", "+"]
+        })
+        huge_coords = pd.concat([coords] * 5000, axis=0).reset_index()
+        dump_data_webdataset(huge_coords, 
+                    genome_fasta='data/sample.fa', 
+                    bigwig_filelist=None,
+                    outdir=self.tempdir,
+                    outprefix='test_target_none',
+                    compress=True,
+                    numProcessors=2)
+        self.assertIsFile(os.path.join(self.tempdir, "test_target_none_0.tar.gz"))
+
     def test_wds_loader(self):
         it = iter(SeqChromDatasetByWds(["data/test_0.tar.gz"], dataloader_kws={"batch_size":3}))
         seq, chrom, target, label = next(it)
