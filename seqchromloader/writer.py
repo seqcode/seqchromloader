@@ -55,7 +55,8 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                         numProcessors=1,
                         transforms=None,
                         braceexpand=False,
-                        DALI=False):
+                        DALI=False,
+                        samples_per_tar=10000):
     """
     Given coordinates dataframe, extract the sequence and chromatin signal, save in webdataset format
 
@@ -83,13 +84,15 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
     :param braceexpand: boolean
     :param DALI: Set to True if you want to use the dataset for NVIDIA DALI, it would save all arrays in bytes, which results in losing the array shape info
     :param DALI: boolean
+    :param samples_per_tar: Number of samples included per tar file
+    :param samples_per_tar: int
     """
     # check parameters
     if (target_bam is not None and target_bw is not None):
         raise Exception("Only one of target_bam and target_bw should be provided!")
 
     # split coordinates and assign chunks to workers
-    num_chunks = math.ceil(len(coords) / 7000)
+    num_chunks = math.ceil(len(coords) / samples_per_tar)
     chunks = np.array_split(coords, num_chunks)
     
     # freeze the common parameters
@@ -131,7 +134,8 @@ def dump_data_webdataset_worker(coords,
                                 outdir="dataset/", 
                                 compress=True,
                                 transforms=None,
-                                DALI=False):
+                                DALI=False,
+                                ):
     # get handlers
     genome_pyfaidx = pyfaidx.Fasta(fasta)
     bigwigs = [pyBigWig.open(bw) for bw in bigwig_files] if bigwig_files is not None else None
