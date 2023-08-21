@@ -192,6 +192,7 @@ def dump_data_webdataset_worker(coords,
                 counter = 0 
 
     if batch_size is not None:
+        feature_dict["__key__"] = ','.join(keys)
         feature_dict["seq.npy"] = np.array(seq_arr)
         feature_dict["chrom.npy"] = np.array(chrom_arr)
         feature_dict["target.npy"] = np.array(target_arr)
