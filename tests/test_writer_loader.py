@@ -92,7 +92,7 @@ class Test(unittest.TestCase):
             'score': [".", "."],
             'strand': ["+", "+"]
         })
-        huge_coords = pd.concat([coords] * 6000, axis=0).reset_index()
+        huge_coords = pd.concat([coords] * 6001, axis=0).reset_index()
         dump_data_webdataset(huge_coords, 
                     genome_fasta='data/sample.fa', 
                     bigwig_filelist=['data/sample.bw'],
