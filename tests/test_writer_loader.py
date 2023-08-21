@@ -112,6 +112,13 @@ class Test(unittest.TestCase):
         )
         seq, chrom, target, label = next(iter(ds))
         self.assertEqual(seq.shape, (2, 128, 4, 5))
+        ## iterate through all samples
+        it = iter(ds)
+        while True:
+            try:
+                next(it)
+            except StopIteration:
+                break
 
     def test_write_load_target_bam(self):
         coords = pd.DataFrame({
