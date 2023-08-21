@@ -83,6 +83,36 @@ class Test(unittest.TestCase):
         self.assertTrue(BedTool().from_dataframe(coords_incl).intersect(interval).count()==len(coords_incl))
         self.assertTrue(BedTool().from_dataframe(coords_excl).intersect(interval).count()==0)
 
+    def test_write_load_batched_target_bam(self):
+        coords = pd.DataFrame({
+            'chrom': ["chr19", "chr19"],
+            'start': [0, 3],
+            'end': [5, 8],
+            'label': [0, 1],
+            'score': [".", "."],
+            'strand': ["+", "+"]
+        })
+        huge_coords = pd.concat([coords] * 6000, axis=0).reset_index()
+        dump_data_webdataset(huge_coords, 
+                    genome_fasta='data/sample.fa', 
+                    bigwig_filelist=['data/sample.bw'],
+                    target_bam='data/sample.bam',
+                    outdir=self.tempdir,
+                    outprefix='test',
+                    compress=True,
+                    numProcessors=2,
+                    batch_size=128)
+        self.assertIsFile(os.path.join(self.tempdir, "test_0.tar.gz"))
+        ds = wds.DataPipeline(
+            wds.SimpleShardList([os.path.join(self.tempdir, "test_0.tar.gz")]),
+            wds.tarfile_to_samples(),
+            wds.decode(),
+            wds.to_tuple("seq.npy", "chrom.npy", "target.npy", "label.npy"),
+            wds.batched(2)
+        )
+        seq, chrom, target, label = next(iter(ds))
+        self.assertEqual(seq.shape, (2, 128, 4, 5))
+
     def test_write_load_target_bam(self):
         coords = pd.DataFrame({
             'chrom': ["chr19", "chr19"],
