@@ -172,6 +172,15 @@ def random_coords(gs:str=None, genome:str=None, incl:BedTool=None, excl:BedTool=
             .shuffle(seed=seed, **shuffle_kwargs)
             .to_dataframe()[["chrom", "start", "end"]])
 
+def motif_scan(motif):
+    """Scan the genome for regions that gives a high precision against given motif
+
+    :arg1: TODO
+    :returns: TODO
+
+    """
+    pass
+
 def chop_genome(chroms:list=None, incl:BedTool=None, excl:BedTool=None, gs=None, genome=None, stride=500, l=500):
     """
     Given a genome size file and chromosome list,

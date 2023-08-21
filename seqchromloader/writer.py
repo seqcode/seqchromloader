@@ -55,8 +55,8 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                         numProcessors=1,
                         transforms=None,
                         braceexpand=False,
-                        DALI=False,
-                        samples_per_tar=10000):
+                        samples_per_tar=10000,
+                        batch_size=None):
     """
     Given coordinates dataframe, extract the sequence and chromatin signal, save in webdataset format
 
@@ -106,7 +106,7 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                                                     compress=compress,
                                                     outdir=outdir,
                                                     transforms=transforms,
-                                                    DALI=DALI)
+                                                    batch_size=batch_size)
     
     count_of_digits = 0
     nc = num_chunks
@@ -134,7 +134,7 @@ def dump_data_webdataset_worker(coords,
                                 outdir="dataset/", 
                                 compress=True,
                                 transforms=None,
-                                DALI=False,
+                                batch_size=None,
                                 ):
     # get handlers
     genome_pyfaidx = pyfaidx.Fasta(fasta)
@@ -149,9 +149,8 @@ def dump_data_webdataset_worker(coords,
     # iterate all records
     filename = os.path.join(outdir, f"{outprefix}.tar.gz" if compress else f"{outprefix}.tar")
     sink = wds.TarWriter(filename, compress=compress)
+    counter = 0; keys = []; seq_arr = []; chrom_arr = []; target_arr = []; label_arr = []
     for rindex, item in enumerate(coords.itertuples()):
-        feature_dict = defaultdict()
-        feature_dict["__key__"] = f"{rindex}_{item.chrom}:{item.start}-{item.end}_{item.strand}" 
 
         try:
             feature = utils.extract_info(
@@ -168,17 +167,35 @@ def dump_data_webdataset_worker(coords,
         except utils.BigWigInaccessible as e:
             continue
         
-        if not DALI:
+        if batch_size is None:    
+            feature_dict = defaultdict()
+            feature_dict["__key__"] = f"{rindex}_{item.chrom}:{item.start}-{item.end}_{item.strand}" 
             feature_dict["seq.npy"] = feature['seq']
             feature_dict["chrom.npy"] = feature['chrom']
             feature_dict["target.npy"] = feature['target']
             feature_dict["label.npy"] = feature['label']
+            sink.write(feature_dict)
         else:
-            feature_dict["seq.npy"] = feature['seq'].tobytes()
-            feature_dict["chrom.npy"] = feature['chrom'].tobytes()
-            feature_dict["target.npy"] = feature['target'].tobytes()
-            feature_dict["label.npy"] = feature['label'].tobytes()
+            counter += 1
+            keys.append(f"{rindex}_{item.chrom}:{item.start}-{item.end}_{item.strand}")
+            seq_arr.append(feature['seq']); chrom_arr.append(feature['chrom']); target_arr.append(feature['target']); label_arr.append(feature['label'])
+            
+            if counter>=batch_size:
+                feature_dict = defaultdict() 
+                feature_dict["__key__"] = ','.join(keys)
+                feature_dict["seq.npy"] = np.array(seq_arr)
+                feature_dict["chrom.npy"] = np.array(chrom_arr)
+                feature_dict["target.npy"] = np.array(target_arr)
+                feature_dict["label.npy"] = np.array(label_arr)
+                sink.write(feature_dict)
+                keys, seq_arr, chrom_arr, target_arr, label_arr = [], [], [], [] ,[]
+                counter = 0 
 
+    if batch_size is not None:
+        feature_dict["seq.npy"] = np.array(seq_arr)
+        feature_dict["chrom.npy"] = np.array(chrom_arr)
+        feature_dict["target.npy"] = np.array(target_arr)
+        feature_dict["label.npy"] = np.array(label_arr)
         sink.write(feature_dict)
 
     sink.close()
