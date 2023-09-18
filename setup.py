@@ -20,7 +20,7 @@ setup(
     # eg: 1.0.0, 1.0.1, 3.0.2, 5.0-beta, etc.
     # You CANNOT upload two versions of your package with the same version number
     # This field is REQUIRED
-    version="0.6.8",
+    version="0.7.0",
 
     # The packages that constitute your project.
     # For my project, I have only one - "pydash".
@@ -34,15 +34,16 @@ setup(
 
     # dependencies
     install_requires=[
+        'biopython>=1.8.0',
         'numpy',
         'pandas',
-        'webdataset>=0.2.0',
         'pyfaidx>=0.7.0',
         'pybedtools>=0.9.0',
         'pysam>=0.19.0',
         'pybigwig>=0.3.0',
-        'torch>=1.10.0',
         'pytorch-lightning',
+        'torch>=1.10.0',
+        'webdataset>=0.2.0',
     ],
 
     # The description that will be shown on PyPI.
