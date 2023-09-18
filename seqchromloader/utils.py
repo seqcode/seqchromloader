@@ -8,6 +8,8 @@ import numpy as np
 import logging
 import pysam
 import pyBigWig
+from Bio import motifs
+from pyfaidx import Fasta
 from multiprocessing import Pool
 from pybedtools import Interval, BedTool
 from pybedtools.helpers import chromsizes
@@ -132,6 +134,77 @@ def make_flank(coords, L, d):
                 .apply(lambda s: pd.Series([s["chrom"], int(s["midpoint"]-L/2), int(s["midpoint"]+L/2)],
                                             index=["chrom", "start", "end"]), axis=1))
 
+def make_gc_match(coords, genome_fa, n=None, seed=1, gc_diff_max=0.05, max_attemps=1000):
+    """
+    Make GC amtch regions by:
+    1. Randomly shuffle genomic regions by bedtools
+    2. Keep regions of GC content matching the global original coordinate dataframes
+
+    :param coords: input coordinate dataframe, first 3 columns are: [chrom, start, end]
+    :type coords: pandas.DataFrame
+    :param genome_fa: genome fasta file
+    :type genome_fa: str
+    :param num_regions: number of returned GC matched regions
+    :type num_regions: int
+    :param seed: random seed
+    :type seed: int
+    :param gc_diff_max: allowed gc percentage difference between input and returned regions
+    :type gc_diff_max: float
+    :param max_attemps: maximum number of attempts to shuffle the input dataframe for extracting GC matched regions
+    :type max_attemps: int
+    :rtype: GC match region coordinate dataframe
+    """
+    genome_pyfaidx = Fasta(genome_fa)
+    # compute global gc percentage in input coordinate dataframe
+    nuc_total, gc_total = 0, 0
+    for item in coords.itertuples():
+        subseq = genome_pyfaidx[item.chrom][item.start:item.end]
+        nuc_total += len(subseq)
+        gc_total += len(subseq) * subseq.gc
+    gc_percent_global = gc_total / nuc_total
+    print(f"Global GC content of input regions is {gc_percent_global}")
+
+    # shuffle regions and keep those of similar gc percentage
+    rng = np.random.RandomState(seed)    # create a random number generator by given seed to get different shuffled regions per loop
+    input_bed = BedTool.from_dataframe(coords)
+    n = len(coords) if n is None else n
+    return_regions = []
+    for i in range(max_attemps):
+        regions_shuffle = input_bed.shuffle(g=f'{genome_fa}.fai', seed=rng.randint(1e5)).to_dataframe()
+        for item in regions_shuffle.itertuples():
+            subseq = genome_pyfaidx[item.chrom][item.start:item.end]
+            if abs(subseq.gc - gc_percent_global) <= gc_diff_max:
+                return_regions.append(item)
+                if len(return_regions) >= n:
+                    return pd.DataFrame(return_regions)[['chrom', 'start', 'end']]
+    
+    print("Reach max attemps, return currently found GC matched regions, increase max_attemps if you need more regions")
+    return pd.DataFrame(return_regions)[['chrom', 'start', 'end']]
+
+def make_motif_match(motif: motifs.Motif, genome_fa, l=200, n=1e4, gc_content=0.4, threshold=1.0, seed=1, max_attemps=1000):
+    """
+    Make regions containing the sub-sequence that matches the given motfi above a threshold
+
+    """
+    # convert motif instance to pssm
+    pwm = motif.counts.normalize(pseudocounts={'A':gc_content, 'C': gc_content, 'G': gc_content, 'T': gc_content})
+    pssm = pwm.log_odds({'A':(1-gc_content)/2,'C':gc_content/2,'G':gc_content/2,'T':(1-gc_content)/2})
+    rpssm = pssm.reverse_complement()
+
+    genome_pyfaidx = Fasta(genome_fa)
+    rng = np.random.RandomState(seed)    # create a random number generator by given seed to get different shuffled regions per loop
+    return_regions = []
+    for i in range(max_attemps):
+        regions_shuffle = BedTool().random(l=l, n=n, g=f'{genome_fa}.fai', seed=rng.randint(1e5)).to_dataframe()
+        for item in regions_shuffle.itertuples():
+            subseq = genome_pyfaidx[item.chrom][item.start:item.end]
+            if max(max(pssm.calculate(subseq.seq)), max(rpssm.calculate(subseq.seq))) > threshold:
+                return_regions.append(item)
+                if len(return_regions) >= n:
+                    return pd.DataFrame(return_regions)[['chrom', 'start', 'end']]
+    
+    print("Reach max attemps, return currently found motif matched regions, increase max_attemps if you need more regions")
+    return pd.DataFrame(return_regions)[['chrom', 'start', 'end']]
     
 def random_coords(gs:str=None, genome:str=None, incl:BedTool=None, excl:BedTool=None,
                   l=500, n=1000, seed=1):
@@ -407,3 +480,11 @@ def extract_info(chrom, start, end, label, genome_pyfaidx, bigwigs, target, stra
             feature[k] = t(feature[k])
     
     return feature
+
+if __name__ == '__main__':
+    from pyjaspar import jaspardb
+    jdb_obj = jaspardb()
+    jdb_obj.fetch_motif_by_id('MA0095.2')
+    motif = jdb_obj.fetch_motif_by_id('MA0095.2')
+
+    make_motif_match(motif, "../data/chr1.fa").to_csv("motif_match.txt", header=True, index=False, sep="\t")

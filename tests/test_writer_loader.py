@@ -3,9 +3,11 @@ import sys
 import numpy as np
 import pandas as pd
 from functools import partial
+
+from torch import threshold
 from seqchromloader import SeqChromDatasetByDataFrame, SeqChromDatasetByBed, SeqChromDatasetByWds, SeqChromDataModule
 from seqchromloader import dump_data_webdataset, convert_data_webdataset
-from seqchromloader import get_genome_sizes, make_random_shift, make_flank, random_coords, chop_genome
+from seqchromloader import get_genome_sizes, make_random_shift, make_flank, random_coords, chop_genome, make_gc_match, make_motif_match
 
 import unittest
 import tempfile
@@ -13,6 +15,8 @@ import shutil
 import pathlib as pl
 import webdataset as wds
 from pybedtools import BedTool
+from pyfaidx import Fasta
+from pyjaspar import jaspardb
 
 class Test(unittest.TestCase):
     def setUp(self) -> None:
@@ -366,6 +370,36 @@ class Test(unittest.TestCase):
         self.assertAlmostEqual(chrom[0,0,3].item(), 4.0/3)
         self.assertEqual(target[0].item(), 0.0)
         self.assertEqual(label[1].item(), 1)
+
+    def test_make_gc_match_regions(self):
+        # input region gc content is 0.345
+        coords = pd.DataFrame({
+                'chrom': ['chr1'],
+                'start': [6000000],
+                'end': [6000200]
+            })
+        g = Fasta('data/chr1.fa')
+        input_gc = g['chr1'][6000000:6000200].gc
+        gc_diff_max = 0.05
+        output_gc_match = make_gc_match(coords, 'data/chr1.fa', n=100, gc_diff_max=gc_diff_max)
+        for item in output_gc_match.itertuples():
+            self.assertTrue(abs(input_gc - g[item.chrom][item.start:item.end].gc)<=gc_diff_max)
+
+    def test_make_motif_match_regions(self):
+        gc_content = 0.4; threshold=2.0
+        jdb_obj = jaspardb()
+        jdb_obj.fetch_motif_by_id('MA0095.2')
+        motif = jdb_obj.fetch_motif_by_id('MA0095.2')
+        pwm = motif.counts.normalize(pseudocounts={'A':gc_content, 'C': gc_content, 'G': gc_content, 'T': gc_content})
+        pssm = pwm.log_odds({'A':(1-gc_content)/2,'C':gc_content/2,'G':gc_content/2,'T':(1-gc_content)/2})
+        rpssm = pssm.reverse_complement()
+
+        g = Fasta('data/chr1.fa')
+        output_motif_match = make_motif_match(motif, "data/chr1.fa", threshold=threshold, gc_content=gc_content)
+        for item in output_motif_match.itertuples():
+            subseq = g[item.chrom][item.start:item.end].seq
+            s = max(max(pssm.calculate(subseq)), max(rpssm.calculate(subseq)))
+            self.assertTrue(s > threshold)
 
 def test_seq_transform(seq):
     return seq + 1
