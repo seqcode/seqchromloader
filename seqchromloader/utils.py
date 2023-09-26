@@ -134,7 +134,7 @@ def make_flank(coords, L, d):
                 .apply(lambda s: pd.Series([s["chrom"], int(s["midpoint"]-L/2), int(s["midpoint"]+L/2)],
                                             index=["chrom", "start", "end"]), axis=1))
 
-def make_gc_match(coords, genome_fa, n=None, seed=1, gc_diff_max=0.05, max_attemps=1000):
+def make_gc_match(coords, genome_fa, l=500, n=None, seed=1, gc_diff_max=0.05, max_attemps=1000, incl=None, excl=None):
     """
     Make GC amtch regions by:
     1. Randomly shuffle genomic regions by bedtools
@@ -144,14 +144,20 @@ def make_gc_match(coords, genome_fa, n=None, seed=1, gc_diff_max=0.05, max_attem
     :type coords: pandas.DataFrame
     :param genome_fa: genome fasta file
     :type genome_fa: str
-    :param num_regions: number of returned GC matched regions
-    :type num_regions: int
+    :param l: random interval size
+    :type l: integer
+    :param n: number of returned GC matched regions
+    :type n: int
     :param seed: random seed
     :type seed: int
     :param gc_diff_max: allowed gc percentage difference between input and returned regions
     :type gc_diff_max: float
     :param max_attemps: maximum number of attempts to shuffle the input dataframe for extracting GC matched regions
     :type max_attemps: int
+    :param excl: regions that chopped regions should overlap with
+    :type excl: BedTool object
+    :param incl: regions that chopped regions shouldn't overlap with
+    :type incl: BedTool object
     :rtype: GC match region coordinate dataframe
     """
     genome_pyfaidx = Fasta(genome_fa)
@@ -170,7 +176,7 @@ def make_gc_match(coords, genome_fa, n=None, seed=1, gc_diff_max=0.05, max_attem
     n = len(coords) if n is None else n
     return_regions = []
     for i in range(max_attemps):
-        regions_shuffle = input_bed.shuffle(g=f'{genome_fa}.fai', seed=rng.randint(1e5)).to_dataframe()
+        regions_shuffle = random_coords(gs=f'{genome_fa}.fai', incl=incl, excl=excl, l=l, n=n, seed=rng.randint(1e5))
         for item in regions_shuffle.itertuples():
             subseq = genome_pyfaidx[item.chrom][item.start:item.end]
             if abs(subseq.gc - gc_percent_global) <= gc_diff_max:
@@ -181,10 +187,31 @@ def make_gc_match(coords, genome_fa, n=None, seed=1, gc_diff_max=0.05, max_attem
     print("Reach max attemps, return currently found GC matched regions, increase max_attemps if you need more regions")
     return pd.DataFrame(return_regions)[['chrom', 'start', 'end']]
 
-def make_motif_match(motif: motifs.Motif, genome_fa, l=200, n=1e4, gc_content=0.4, threshold=1.0, seed=1, max_attemps=1000):
+def make_motif_match(motif: motifs.Motif, genome_fa, l=500, n=1000, gc_content=0.4, threshold=1.0, seed=1, max_attemps=1000, incl=None, excl=None):
     """
     Make regions containing the sub-sequence that matches the given motfi above a threshold
 
+    :param motif: biopython motif object
+    :type motif: motifs.Motif
+    :param genome_fa: genome fasta file
+    :type genome_fa: str
+    :param l: random interval size
+    :type l: integer
+    :param n: number of returned motif matched regions
+    :type n: int
+    :param seed: random seed
+    :type seed: int
+    :param gc_content: background gc content to compute pwm score
+    :type gc_content: float
+    :param threshold: threshold to filter regions containing sub-sequence match the given motif by pssm score
+    :type threshold: float
+    :param max_attemps: maximum number of attempts to shuffle the input dataframe for extracting GC matched regions
+    :type max_attemps: int
+    :param excl: regions that chopped regions should overlap with
+    :type excl: BedTool object
+    :param incl: regions that chopped regions shouldn't overlap with
+    :type incl: BedTool object
+    :rtype: motif match region coordinate dataframe
     """
     # convert motif instance to pssm
     pwm = motif.counts.normalize(pseudocounts={'A':gc_content, 'C': gc_content, 'G': gc_content, 'T': gc_content})
@@ -195,7 +222,7 @@ def make_motif_match(motif: motifs.Motif, genome_fa, l=200, n=1e4, gc_content=0.
     rng = np.random.RandomState(seed)    # create a random number generator by given seed to get different shuffled regions per loop
     return_regions = []
     for i in range(max_attemps):
-        regions_shuffle = BedTool().random(l=l, n=n, g=f'{genome_fa}.fai', seed=rng.randint(1e5)).to_dataframe()
+        regions_shuffle = random_coords(gs=f'{genome_fa}.fai', incl=incl, excl=excl, l=l, n=n, seed=rng.randint(1e5))
         for item in regions_shuffle.itertuples():
             subseq = genome_pyfaidx[item.chrom][item.start:item.end]
             if max(max(pssm.calculate(subseq.seq)), max(rpssm.calculate(subseq.seq))) > threshold:
@@ -218,9 +245,9 @@ def random_coords(gs:str=None, genome:str=None, incl:BedTool=None, excl:BedTool=
     :param genome: genome build name, only one of `gs` and `genome` is required
     :type genome: string
     :param excl: regions that chopped regions should overlap with
-    :type incl: BedTool object
-    :param incl: regions that chopped regions shouldn't overlap with
     :type excl: BedTool object
+    :param incl: regions that chopped regions shouldn't overlap with
+    :type incl: BedTool object
     :param l: random interval size
     :type l: integer
     :param n: number of random intervals generated
