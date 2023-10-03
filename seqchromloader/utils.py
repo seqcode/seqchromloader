@@ -482,12 +482,19 @@ def extract_target(chrom, start, end, strand, target):
         target_array = np.array([np.nan], dtype="float32")
     return target_array
 
-def extract_info(chrom, start, end, label, genome_pyfaidx, bigwigs, target, strand="+", transforms:dict=None):
-    seq_array = extract_dnaOneHot(chrom, start, end, strand, genome_pyfaidx)
+def extract_info(chrom, start, end, label, genome_pyfaidx, bigwigs, target, strand="+", transforms:dict=None, patch_left=0, patch_right=0):
+    if patch_left > 0: patched_start = start - patch_left 
+    else: patched_start = start
+    if patch_right > 0: patched_end = end + patch_right 
+    else: patched_end = end
+
+    seq_array = extract_dnaOneHot(chrom, patched_start, patched_end, strand, genome_pyfaidx)
+    assert seq_array.shape[1] == patched_end - patched_start, f"extracted DNA sequence length different from given region ({chrom}:{start}-{end}) length, does the coordinate hit the chromosome boundary?"
 
     #chromatin track
     if bigwigs is not None and len(bigwigs)>0:
-        chroms_array = extract_bw(chrom, start, end, strand, bigwigs)
+        chroms_array = extract_bw(chrom, patched_start, patched_end, strand, bigwigs)
+        assert chroms_array.shape[1] == patched_end - patched_start, f"extracted chrom track length different from given region ({chrom}:{start}-{end}) length, does the coordinate hit the chromosome boundary?"
     else:
         chroms_array = np.array([np.nan], dtype="float32")
     # label

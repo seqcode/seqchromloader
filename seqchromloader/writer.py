@@ -50,6 +50,7 @@ def convert_data_webdataset(wds_in, wds_out, transforms=None, compress=False):
 def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                         target_bam=None,
                         target_bw=None, 
+                        patch_left=0, patch_right=0,
                         outdir="dataset/", outprefix="seqchrom", 
                         compress=True, 
                         numProcessors=1,
@@ -70,6 +71,10 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
     :type target_bam: str or None
     :param target_bw: bigwig file to get # reads in each region, mutually exclusive with `target_bam`
     :type target_bw: str or None
+    :param patch_left: extend the seq and chrom inputs on the left by `patch_left`bp
+    :type patch_left: int
+    :param patch_right: extend the seq and chrom inputs on the right by `patch_right`bp
+    :type patch_right: int
     :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
     :type transforms: dict of functions
     :param outdir: output directory to save files in
@@ -103,6 +108,8 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
                                                     bigwig_files=bigwig_filelist,
                                                     target_bam=target_bam,
                                                     target_bw=target_bw,
+                                                    patch_left=patch_left,
+                                                    patch_right=patch_right,
                                                     compress=compress,
                                                     outdir=outdir,
                                                     transforms=transforms,
@@ -131,6 +138,7 @@ def dump_data_webdataset_worker(coords,
                                 bigwig_files=None,
                                 target_bam=None,
                                 target_bw=None,
+                                patch_left=0, patch_right=0,
                                 outdir="dataset/", 
                                 compress=True,
                                 transforms=None,
@@ -163,8 +171,17 @@ def dump_data_webdataset_worker(coords,
                 target=target,
                 strand=item.strand,
                 transforms=transforms,
+                patch_left=patch_left,
+                patch_right=patch_right
             )
         except utils.BigWigInaccessible as e:
+            print(f"Skip the region {item.chrom}:{item.start}-{item.end} due to BigWigInaccessible Exception")
+            continue
+        except pyfaidx.FetchError as e:
+            print(f"Skip the region {item.chrom}:{item.start}-{item.end} due to pyfaidx FetchError")
+            continue
+        except AssertionError as e:
+            print(f"Skip the region {item.chrom}:{item.start}-{item.end} due to AssertionError")
             continue
         
         if batch_size is None:    
