@@ -90,8 +90,8 @@ class Test(unittest.TestCase):
     def test_write_load_batched_target_bam(self):
         coords = pd.DataFrame({
             'chrom': ["chr19", "chr19"],
-            'start': [0, 3],
-            'end': [5, 8],
+            'start': [2, 3],
+            'end': [7, 8],
             'label': [0, 1],
             'score': [".", "."],
             'strand': ["+", "+"]
@@ -105,7 +105,8 @@ class Test(unittest.TestCase):
                     outprefix='test',
                     compress=True,
                     numProcessors=2,
-                    batch_size=128)
+                    batch_size=2,
+                    patch_left=2, patch_right=2)
         self.assertIsFile(os.path.join(self.tempdir, "test_0.tar.gz"))
         ds = wds.DataPipeline(
             wds.SimpleShardList([os.path.join(self.tempdir, "test_0.tar.gz")]),
@@ -115,7 +116,7 @@ class Test(unittest.TestCase):
             wds.batched(2)
         )
         seq, chrom, target, label = next(iter(ds))
-        self.assertEqual(seq.shape, (2, 128, 4, 5))
+        self.assertEqual(seq.shape, (2, 2, 4, 9))
         ## iterate through all samples
         it = iter(ds)
         while True:
