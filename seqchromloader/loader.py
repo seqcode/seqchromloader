@@ -4,6 +4,7 @@ description = """
     Given bed file, return sequence and chromatin info
 """
 
+import math
 import logging
 import torch
 import random
@@ -20,11 +21,6 @@ from pytorch_lightning import LightningDataModule
 
 from seqchromloader import utils
 
-def worker_init_fn(worker_id):
-    worker_info = torch.utils.data.get_worker_info()
-    dataset = worker_info.dataset
-    dataset.initialize()
-
 class SeqChromLoader():
     """
     :param dataloader_kws: keyword arguments passed to ``torch.utils.data.DataLoader``
@@ -37,14 +33,12 @@ class SeqChromLoader():
     def __call__(self, *args, dataloader_kws:dict={}, **kwargs):
         # default dataloader kws
         if dataloader_kws is not None:
-            wif = dataloader_kws.pop("worker_init_fn", worker_init_fn)
             num_workers = dataloader_kws.pop("num_workers", 1) 
         else:
-            wif = worker_init_fn
             num_workers = 1
 
         return DataLoader(self.SeqChromDataset(*args, **kwargs),
-                            worker_init_fn=wif, num_workers=num_workers, **dataloader_kws)
+                          num_workers=num_workers, **dataloader_kws)
 
 def seqChromLoaderCurry(SeqChromDataset):
 
@@ -97,7 +91,7 @@ class _SeqChromDatasetByWds(IterableDataset):
 
 SeqChromDatasetByWds = seqChromLoaderCurry(_SeqChromDatasetByWds)
 
-class _SeqChromDatasetByDataFrame(Dataset):
+class _SeqChromDatasetByDataFrame(IterableDataset):
     """
     :param dataframe: pandas dataframe describing genomics regions to extract info from, every region has to be of the same length.
     :type dataframe: pd.DataFrame
@@ -116,7 +110,6 @@ class _SeqChromDatasetByDataFrame(Dataset):
                  bigwig_filelist:list, 
                  target_bam=None, 
                  transforms:dict=None, 
-                 initialize_first=False,
                  return_region=False):
         
         self.dataframe = dataframe        
@@ -128,10 +121,9 @@ class _SeqChromDatasetByDataFrame(Dataset):
         self.target_pysam = None
 
         self.transforms = transforms
-
-        if initialize_first: self.initialize()
-
         self.return_region = return_region
+        
+        self.start = 0; self.end = len(self.dataframe)
     
     def initialize(self):
         # create the stream handler after child processes spawned to enable parallel reading
@@ -141,31 +133,45 @@ class _SeqChromDatasetByDataFrame(Dataset):
         if self.target_bam is not None:
             self.target_pysam = pysam.AlignmentFile(self.target_bam)
     
-    def __len__(self):
-        return len(self.dataframe)
+    def __iter__(self):
+        self.initialize()
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is not None:  # single-process data loading, return the full iterator
+            # split workload
+            per_worker = int(math.ceil((self.end - self.start) / float(worker_info.num_workers)))
+            worker_id = worker_info.id
+            iter_start = self.start + worker_id * per_worker
+            iter_end = min(iter_start + per_worker, self.end)
+            # replace start and end
+            self.start = iter_start; self.end = iter_end
 
-    def __getitem__(self, idx):
-        item = self.dataframe.iloc[idx,]
-        try:
-            feature = utils.extract_info(
-                item.chrom,
-                item.start,
-                item.end,
-                item.label,
-                genome_pyfaidx=self.genome_pyfaidx,
-                bigwigs=self.bigwigs,
-                target=self.target_pysam,
-                strand=item.strand,
-                transforms=self.transforms
-            )
-        except utils.BigWigInaccessible as e:
-            raise e
+        for idx in range(self.start, self.end):
+            item = self.dataframe.iloc[idx,]
+            try:
+                feature = utils.extract_info(
+                    item.chrom,
+                    item.start,
+                    item.end,
+                    item.label,
+                    genome_pyfaidx=self.genome_pyfaidx,
+                    bigwigs=self.bigwigs,
+                    target=self.target_pysam,
+                    strand=item.strand,
+                    transforms=self.transforms
+                )
+            except utils.BigWigInaccessible as e:
+                logging.warn(f"Inaccessible bigwig error detected in region {item.chrom}:{item.start}-{item.end}, Skipping...")
+                continue
+            except AssertionError as e:
+                logging.warn(f"AssertionError detected in region {item.chrom}:{item.start}-{item.end}, Skipping")
+                continue
 
-        if not self.return_region:
-            return feature['seq'], feature['chrom'], feature['target'], feature['label']
-        else:
-            return f'{item.chrom}:{item.start}-{item.end}', feature['seq'], feature['chrom'], feature['target'], feature['label']
-    
+            if not self.return_region:
+                yield feature['seq'], feature['chrom'], feature['target'], feature['label']
+            else:
+                yield f'{item.chrom}:{item.start}-{item.end}', feature['seq'], feature['chrom'], feature['target'], feature['label']
+
+
 SeqChromDatasetByDataFrame = seqChromLoaderCurry(_SeqChromDatasetByDataFrame)
 
 class _SeqChromDatasetByBed(_SeqChromDatasetByDataFrame):
@@ -181,14 +187,13 @@ class _SeqChromDatasetByBed(_SeqChromDatasetByDataFrame):
     :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
     :type transforms: dict of functions
     """
-    def __init__(self, bed: str, genome_fasta: str, bigwig_filelist:list, target_bam=None, transforms:dict=None, initialize_first=False, return_region=False):
+    def __init__(self, bed: str, genome_fasta: str, bigwig_filelist:list, target_bam=None, transforms:dict=None, return_region=False):
         dataframe = pd.read_table(bed, header=None, names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
         super().__init__(dataframe,
                          genome_fasta,
                          bigwig_filelist,
                          target_bam,
                          transforms,
-                         initialize_first,
                          return_region)
 
 SeqChromDatasetByBed = seqChromLoaderCurry(_SeqChromDatasetByBed)
