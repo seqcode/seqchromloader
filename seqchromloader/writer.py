@@ -186,7 +186,7 @@ def dump_data_webdataset_worker(coords,
         
         if batch_size is None:    
             feature_dict = defaultdict()
-            feature_dict["__key__"] = f"{rindex}_{item.chrom}:{item.start}-{item.end}_{item.strand}" 
+            feature_dict["__key__"] = f"{rindex}_{item.chrom}:{item.start-patch_left}-{item.end+patch_right}_{item.strand}" 
             feature_dict["seq.npy"] = feature['seq']
             feature_dict["chrom.npy"] = feature['chrom']
             feature_dict["target.npy"] = feature['target']
