@@ -110,7 +110,8 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
                  bigwig_filelist:list, 
                  target_bam=None, 
                  transforms:dict=None, 
-                 return_region=False):
+                 return_region=False,
+                 patch_left=0, patch_right=0):
         
         self.dataframe = dataframe        
         self.genome_fasta = genome_fasta
@@ -122,6 +123,8 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
 
         self.transforms = transforms
         self.return_region = return_region
+        self.patch_left = patch_left
+        self.patch_right = patch_right
         
         self.start = 0; self.end = len(self.dataframe)
     
@@ -157,7 +160,9 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
                     bigwigs=self.bigwigs,
                     target=self.target_pysam,
                     strand=item.strand,
-                    transforms=self.transforms
+                    transforms=self.transforms,
+                    patch_left=self.patch_left,
+                    patch_right=self.patch_right
                 )
             except utils.BigWigInaccessible as e:
                 logging.warn(f"Inaccessible bigwig error detected in region {item.chrom}:{item.start}-{item.end}, Skipping...")
@@ -187,14 +192,17 @@ class _SeqChromDatasetByBed(_SeqChromDatasetByDataFrame):
     :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
     :type transforms: dict of functions
     """
-    def __init__(self, bed: str, genome_fasta: str, bigwig_filelist:list, target_bam=None, transforms:dict=None, return_region=False):
+    def __init__(self, bed: str, genome_fasta: str, bigwig_filelist:list, target_bam=None, 
+                 transforms:dict=None, return_region=False,
+                 patch_left=0, patch_right=0):
         dataframe = pd.read_table(bed, header=None, names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
         super().__init__(dataframe,
                          genome_fasta,
                          bigwig_filelist,
                          target_bam,
                          transforms,
-                         return_region)
+                         return_region,
+                         patch_left, patch_right)
 
 SeqChromDatasetByBed = seqChromLoaderCurry(_SeqChromDatasetByBed)
 
