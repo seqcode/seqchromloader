@@ -213,6 +213,7 @@ def make_motif_match(motif: motifs.Motif, genome_fa, l=500, n=1000, gc_content=0
     :type incl: BedTool object
     :rtype: motif match region coordinate dataframe
     """
+    assert len(motif) <= l  # make sure the interval len is larger than motif len
     # convert motif instance to pssm
     pwm = motif.counts.normalize(pseudocounts={'A':gc_content, 'C': gc_content, 'G': gc_content, 'T': gc_content})
     pssm = pwm.log_odds({'A':(1-gc_content)/2,'C':gc_content/2,'G':gc_content/2,'T':(1-gc_content)/2})
@@ -225,7 +226,23 @@ def make_motif_match(motif: motifs.Motif, genome_fa, l=500, n=1000, gc_content=0
         regions_shuffle = random_coords(gs=f'{genome_fa}.fai', incl=incl, excl=excl, l=l, n=n, seed=rng.randint(1e5))
         for item in regions_shuffle.itertuples():
             subseq = genome_pyfaidx[item.chrom][item.start:item.end]
-            if max(max(pssm.calculate(subseq.seq)), max(rpssm.calculate(subseq.seq))) > threshold:
+            if len(subseq) < len(motif):
+                print("Skip subsequence due to length < motif length")
+                continue
+            pssm_score = pssm.calculate(subseq.seq); rpssm_score = rpssm.calculate(subseq.seq)
+
+            if len(subseq) == len(motif):
+                max_pssm_score = pssm_score; max_rpssm_score = rpssm_score # if subseq len == motif len, calculate returns a single value
+            else:
+                max_pssm_score = max(pssm_score); max_rpssm_score = max(rpssm_score)
+
+            if np.isnan(max_pssm_score) or np.isnan(max_rpssm_score):
+                print("Skip subsequence due to NaN pssm/rpssm score")
+                continue
+
+            max_score = max(max_pssm_score, max_rpssm_score)    
+
+            if max_score > threshold:
                 return_regions.append(item)
                 if len(return_regions) >= n:
                     return pd.DataFrame(return_regions)[['chrom', 'start', 'end']]
