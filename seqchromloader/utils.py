@@ -232,13 +232,11 @@ def make_motif_match(motif: motifs.Motif, genome_fa, l=500, n=1000, gc_content=0
             pssm_score = pssm.calculate(subseq.seq); rpssm_score = rpssm.calculate(subseq.seq)
 
             if len(subseq) == len(motif):
-                max_pssm_score = pssm_score; max_rpssm_score = rpssm_score # if subseq len == motif len, calculate returns a single value
+                max_pssm_score = np.nan_to_num(pssm_score, nan=-100)
+                max_rpssm_score = np.nan_to_num(rpssm_score, nan=-100) # if subseq len == motif len, calculate returns a single value
             else:
-                max_pssm_score = max(pssm_score); max_rpssm_score = max(rpssm_score)
-
-            if np.isnan(max_pssm_score) or np.isnan(max_rpssm_score):
-                print("Skip subsequence due to NaN pssm/rpssm score")
-                continue
+                max_pssm_score = max(np.nan_to_num(pssm_score, nan=-100))
+                max_rpssm_score = max(np.nan_to_num(rpssm_score, nan=-100))
 
             max_score = max(max_pssm_score, max_rpssm_score)    
 
