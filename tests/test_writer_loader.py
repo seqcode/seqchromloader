@@ -281,6 +281,21 @@ class Test(unittest.TestCase):
         self.assertEqual(target[0].item(), 2.0)
         self.assertEqual(label[1].item(), 1)
 
+    def test_df_loader_no_bigwig(self):
+        dataframe = pd.read_table("data/sample.bed", header=None, sep="\t", names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
+        it = iter(SeqChromDatasetByDataFrame(
+            dataframe=dataframe,
+            genome_fasta="data/sample.fa",
+            bigwig_filelist=None,
+            target_bam="data/sample.bam",
+            dataloader_kws={"batch_size":2,
+                            "shuffle":False}
+        ))
+        seq, chrom, target, label = next(it)
+        self.assertEqual(seq[1,0,4].item(), 1.0)
+        self.assertEqual(target[0].item(), 2.0)
+        self.assertEqual(label[1].item(), 1)
+
     def test_bed_loader(self):
         it = iter(SeqChromDatasetByBed(
             bed="data/sample.bed",

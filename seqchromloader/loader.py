@@ -107,7 +107,7 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
     def __init__(self, 
                  dataframe: pd.DataFrame, 
                  genome_fasta: str, 
-                 bigwig_filelist:list, 
+                 bigwig_filelist:list=None, 
                  target_bam=None, 
                  transforms:dict=None, 
                  return_region=False,
@@ -132,7 +132,7 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
         # create the stream handler after child processes spawned to enable parallel reading
         # this function will be called by worker_init_function in DataLoader
         self.genome_pyfaidx = pyfaidx.Fasta(self.genome_fasta)
-        self.bigwigs = [pyBigWig.open(bw) for bw in self.bigwig_filelist]
+        self.bigwigs = [pyBigWig.open(bw) for bw in self.bigwig_filelist] if self.bigwig_filelist is not None else None
         if self.target_bam is not None:
             self.target_pysam = pysam.AlignmentFile(self.target_bam)
     
@@ -192,7 +192,7 @@ class _SeqChromDatasetByBed(_SeqChromDatasetByDataFrame):
     :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
     :type transforms: dict of functions
     """
-    def __init__(self, bed: str, genome_fasta: str, bigwig_filelist:list, target_bam=None, 
+    def __init__(self, bed: str, genome_fasta: str, bigwig_filelist:list=None, target_bam=None, 
                  transforms:dict=None, return_region=False,
                  patch_left=0, patch_right=0):
         dataframe = pd.read_table(bed, header=None, names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
