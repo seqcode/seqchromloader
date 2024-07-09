@@ -127,6 +127,9 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
         self.patch_right = patch_right
         
         self.start = 0; self.end = len(self.dataframe)
+
+    def __len__(self):
+        return len(self.dataframe)
     
     def initialize(self):
         # create the stream handler after child processes spawned to enable parallel reading
