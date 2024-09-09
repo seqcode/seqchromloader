@@ -406,7 +406,7 @@ class Test(unittest.TestCase):
         jdb_obj = jaspardb()
         jdb_obj.fetch_motif_by_id('MA0095.2')
         motif = jdb_obj.fetch_motif_by_id('MA0095.2')
-        pwm = motif.counts.normalize(pseudocounts={'A':gc_content, 'C': gc_content, 'G': gc_content, 'T': gc_content})
+        pwm = motif.counts.normalize(pseudocounts={'A':1-gc_content, 'C': gc_content, 'G': gc_content, 'T': 1-gc_content})
         pssm = pwm.log_odds({'A':(1-gc_content)/2,'C':gc_content/2,'G':gc_content/2,'T':(1-gc_content)/2})
         rpssm = pssm.reverse_complement()
 
