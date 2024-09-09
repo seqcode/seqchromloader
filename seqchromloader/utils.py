@@ -215,7 +215,7 @@ def make_motif_match(motif: motifs.Motif, genome_fa, l=500, n=1000, gc_content=0
     """
     assert len(motif) <= l  # make sure the interval len is larger than motif len
     # convert motif instance to pssm
-    pwm = motif.counts.normalize(pseudocounts={'A':gc_content, 'C': gc_content, 'G': gc_content, 'T': gc_content})
+    pwm = motif.counts.normalize(pseudocounts={'A':1-gc_content, 'C': gc_content, 'G': gc_content, 'T': 1-gc_content})
     pssm = pwm.log_odds({'A':(1-gc_content)/2,'C':gc_content/2,'G':gc_content/2,'T':(1-gc_content)/2})
     rpssm = pssm.reverse_complement()
 
