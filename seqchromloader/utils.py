@@ -60,26 +60,22 @@ def filter_chromosomes(coords, to_filter=None, to_keep=None):
         print("Both to_filter and to_keep are provided, only to_filter will work under this circumstance!")
     
     if to_filter:
-        corods_out = coords.copy()
-        for chromosome in to_filter:
-            # note: using the str.contains method to remove all
-            # contigs; for example: chrUn_JH584304
-            bool_filter = ~(corods_out['chrom'].str.contains(chromosome))
-            corods_out = corods_out[bool_filter]
+        coords_out = coords.copy()
+        # note: using the str.contains method to remove all
+        # contigs; for example: chrUn_JH584304
+        bool_filter = ~(coords_out['chrom'].isin(to_filter))
+        coords_out = coords_out[bool_filter]
     elif to_keep:
+        coords_out = coords.copy()
         # keep only the to_keep chromosomes:
         # note: this is slightly different from to_filter, because
         # at a time, if only one chromosome is retained, it can be used
         # sequentially.
-        filtered_chromosomes = []
-        for chromosome in to_keep:
-            filtered_record = coords[(coords['chrom'] == chromosome)]
-            filtered_chromosomes.append(filtered_record)
-        # merge the retained chromosomes
-        corods_out = pd.concat(filtered_chromosomes)
+        bool_keep = coords_out['chrom'].isin(to_keep)
+        coords_out = coords_out[bool_keep]
     else:
-        corods_out = coords
-    return corods_out
+        coords_out = coords
+    return coords_out
 
 def make_random_shift(coords, L, buffer=0, rng=None):
     """
