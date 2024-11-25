@@ -184,21 +184,21 @@ def dump_data_webdataset_worker(coords,
             print(f"Skip the region {item.chrom}:{item.start}-{item.end} due to AssertionError")
             continue
         
+        feature_dict = defaultdict()
         if batch_size is None:    
-            feature_dict = defaultdict()
             feature_dict["__key__"] = f"{rindex}_{item.chrom}:{item.start-patch_left}-{item.end+patch_right}_{item.strand}" 
             feature_dict["seq.npy"] = feature['seq']
             feature_dict["chrom.npy"] = feature['chrom']
             feature_dict["target.npy"] = feature['target']
             feature_dict["label.npy"] = feature['label']
             sink.write(feature_dict)
+            feature_dict = defaultdict()
         else:
             counter += 1
             keys.append(f"{rindex}_{item.chrom}:{item.start}-{item.end}_{item.strand}")
             seq_arr.append(feature['seq']); chrom_arr.append(feature['chrom']); target_arr.append(feature['target']); label_arr.append(feature['label'])
             
             if counter>=batch_size:
-                feature_dict = defaultdict() 
                 feature_dict["__key__"] = ','.join(keys)
                 feature_dict["seq.npy"] = np.array(seq_arr)
                 feature_dict["chrom.npy"] = np.array(chrom_arr)
@@ -207,6 +207,7 @@ def dump_data_webdataset_worker(coords,
                 sink.write(feature_dict)
                 keys, seq_arr, chrom_arr, target_arr, label_arr = [], [], [], [] ,[]
                 counter = 0 
+                feature_dict = defaultdict() 
 
     if batch_size is not None:
         feature_dict["__key__"] = ','.join(keys)
