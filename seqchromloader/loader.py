@@ -111,7 +111,8 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
                  target_bam=None, 
                  transforms:dict=None, 
                  return_region=False,
-                 patch_left=0, patch_right=0):
+                 patch_left=0, patch_right=0,
+                 shuffle=False):
         
         self.dataframe = dataframe        
         self.genome_fasta = genome_fasta
@@ -125,6 +126,7 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
         self.return_region = return_region
         self.patch_left = patch_left
         self.patch_right = patch_right
+        self.shuffle = shuffle
         
         self.start = 0; self.end = len(self.dataframe)
 
@@ -138,6 +140,9 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
         self.bigwigs = [pyBigWig.open(bw) for bw in self.bigwig_filelist] if self.bigwig_filelist is not None else None
         if self.target_bam is not None:
             self.target_pysam = pysam.AlignmentFile(self.target_bam)
+        # shuffle the dataframe if need
+        if self.shuffle:
+            self.dataframe.sample(frac=1., replace=False)
     
     def __iter__(self):
         self.initialize()
@@ -197,7 +202,7 @@ class _SeqChromDatasetByBed(_SeqChromDatasetByDataFrame):
     """
     def __init__(self, bed: str, genome_fasta: str, bigwig_filelist:list=None, target_bam=None, 
                  transforms:dict=None, return_region=False,
-                 patch_left=0, patch_right=0):
+                 patch_left=0, patch_right=0, shuffle=False):
         dataframe = pd.read_table(bed, header=None, names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
         super().__init__(dataframe,
                          genome_fasta,
@@ -205,7 +210,7 @@ class _SeqChromDatasetByBed(_SeqChromDatasetByDataFrame):
                          target_bam,
                          transforms,
                          return_region,
-                         patch_left, patch_right)
+                         patch_left, patch_right, shuffle)
 
 SeqChromDatasetByBed = seqChromLoaderCurry(_SeqChromDatasetByBed)
 
