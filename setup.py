@@ -20,7 +20,7 @@ setup(
     # eg: 1.0.0, 1.0.1, 3.0.2, 5.0-beta, etc.
     # You CANNOT upload two versions of your package with the same version number
     # This field is REQUIRED
-    version="0.8.1",
+    version="0.8.2",
 
     # The packages that constitute your project.
     # For my project, I have only one - "pydash".
