@@ -17,6 +17,7 @@ import webdataset as wds
 from math import sqrt, ceil
 from itertools import islice
 from torch.utils.data import Dataset, IterableDataset, DataLoader
+from pybedtools import BedTool
 from pytorch_lightning import LightningDataModule
 
 from seqchromloader import utils
@@ -203,7 +204,13 @@ class _SeqChromDatasetByBed(_SeqChromDatasetByDataFrame):
     def __init__(self, bed: str, genome_fasta: str, bigwig_filelist:list=None, target_bam=None, 
                  transforms:dict=None, return_region=False,
                  patch_left=0, patch_right=0, shuffle=False):
-        dataframe = pd.read_table(bed, header=None, names=['chrom', 'start', 'end', 'label', 'score', 'strand' ])
+        dataframe = BedTool(bed).to_dataframe().iloc[:, :6]
+        dataframe = dataframe.rename(columns={'name': 'label'})
+        # assign fake labels and strands if missing
+        if not 'label' in dataframe.columns:
+            dataframe['label'] = -1
+        if not 'strand' in dataframe.columns:
+            dataframe['strand'] = '+'
         super().__init__(dataframe,
                          genome_fasta,
                          bigwig_filelist,
