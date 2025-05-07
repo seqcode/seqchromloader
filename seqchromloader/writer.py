@@ -20,6 +20,8 @@ import webdataset as wds
 from . import utils
 from .loader import _SeqChromDatasetByWds
 
+logger = logging.getLogger(__name__)
+
 def convert_data_webdataset(wds_in, wds_out, transforms=None, compress=False):
     """
     Transform the provided webdataset
@@ -144,7 +146,7 @@ def dump_data_webdataset_worker(coords,
                                 transforms=None,
                                 batch_size=None,
                                 ):
-    # get handlers
+    #get handlers
     genome_pyfaidx = pyfaidx.Fasta(fasta)
     bigwigs = [pyBigWig.open(bw) for bw in bigwig_files] if bigwig_files is not None else None
     if target_bam is not None:
@@ -175,13 +177,13 @@ def dump_data_webdataset_worker(coords,
                 patch_right=patch_right
             )
         except utils.BigWigInaccessible as e:
-            print(f"Skip the region {item.chrom}:{item.start}-{item.end} due to BigWigInaccessible Exception")
+            logger.warning(f"Skip the region {item.chrom}:{item.start}-{item.end} due to BigWigInaccessible Exception")
             continue
         except pyfaidx.FetchError as e:
-            print(f"Skip the region {item.chrom}:{item.start}-{item.end} due to pyfaidx FetchError")
+            logger.warning(f"Skip the region {item.chrom}:{item.start}-{item.end} due to pyfaidx FetchError")
             continue
         except AssertionError as e:
-            print(f"Skip the region {item.chrom}:{item.start}-{item.end} due to AssertionError")
+            logger.warning(f"Skip the region {item.chrom}:{item.start}-{item.end} due to AssertionError")
             continue
         
         feature_dict = defaultdict()

@@ -14,6 +14,8 @@ from multiprocessing import Pool
 from pybedtools import Interval, BedTool
 from pybedtools.helpers import chromsizes
 
+logger = logging.getLogger(__name__)
+
 def get_genome_sizes(gs=None, genome=None, to_filter=None, to_keep=None):
     """
     Loads the genome sizes file, filter or keep chromosomes
@@ -57,7 +59,7 @@ def filter_chromosomes(coords, to_filter=None, to_keep=None):
     """
     
     if to_filter and to_keep:
-        print("Both to_filter and to_keep are provided, only to_filter will work under this circumstance!")
+        logger.error("Both to_filter and to_keep are provided, only to_filter will work under this circumstance!")
     
     if to_filter:
         coords_out = coords.copy()
@@ -164,7 +166,7 @@ def make_gc_match(coords, genome_fa, l=500, n=None, seed=1, gc_diff_max=0.05, ma
         nuc_total += len(subseq)
         gc_total += len(subseq) * subseq.gc
     gc_percent_global = gc_total / nuc_total
-    print(f"Global GC content of input regions is {gc_percent_global}")
+    logger.info(f"Global GC content of input regions is {gc_percent_global}")
 
     # shuffle regions and keep those of similar gc percentage
     rng = np.random.RandomState(seed)    # create a random number generator by given seed to get different shuffled regions per loop
@@ -180,7 +182,7 @@ def make_gc_match(coords, genome_fa, l=500, n=None, seed=1, gc_diff_max=0.05, ma
                 if len(return_regions) >= n:
                     return pd.DataFrame(return_regions)[['chrom', 'start', 'end']]
     
-    print("Reach max attemps, return currently found GC matched regions, increase max_attemps if you need more regions")
+    logger.warning("Reach max attemps, return currently found GC matched regions, increase max_attemps if you need more regions")
     return pd.DataFrame(return_regions)[['chrom', 'start', 'end']]
 
 def make_motif_match(motif: motifs.Motif, genome_fa, l=500, n=1000, gc_content=0.4, threshold=1.0, seed=1, max_attemps=1000, incl=None, excl=None):
@@ -223,7 +225,7 @@ def make_motif_match(motif: motifs.Motif, genome_fa, l=500, n=1000, gc_content=0
         for item in regions_shuffle.itertuples():
             subseq = genome_pyfaidx[item.chrom][item.start:item.end]
             if len(subseq) < len(motif):
-                print("Skip subsequence due to length < motif length")
+                logger.warning("Skip subsequence due to length < motif length")
                 continue
             pssm_score = pssm.calculate(subseq.seq); rpssm_score = rpssm.calculate(subseq.seq)
 
@@ -241,7 +243,7 @@ def make_motif_match(motif: motifs.Motif, genome_fa, l=500, n=1000, gc_content=0
                 if len(return_regions) >= n:
                     return pd.DataFrame(return_regions)[['chrom', 'start', 'end']]
     
-    print("Reach max attemps, return currently found motif matched regions, increase max_attemps if you need more regions")
+    logger.warning("Reach max attemps, return currently found motif matched regions, increase max_attemps if you need more regions")
     return pd.DataFrame(return_regions)[['chrom', 'start', 'end']]
     
 def random_coords(gs:str=None, genome:str=None, incl:BedTool=None, excl:BedTool=None,
@@ -359,8 +361,8 @@ def compute_mean_std_bigwig(bigwig):
         try:
             stds.append(bw.stats(chrom, type="std", exact=True)[0])
         except RuntimeError:
-            print(chrom)
-            print(length)
+            logger.error(chrom)
+            logger.error(length)
             raise Exception
     
     # compute overall metrics
@@ -394,7 +396,7 @@ class DNA2OneHot(object):
             try:
                 seqMatrix[self.DNA2Index[dnaSeq[j]], j] = 1
             except KeyError as e:
-                print(f"Keyerror happened at position {j}: {dnaSeq[j]}, legal keys are: [A, C, G, T, N]")
+                logger.error(f"Keyerror happened at position {j}: {dnaSeq[j]}, legal keys are: [A, C, G, T, N]")
                 continue
         return seqMatrix
 
@@ -424,7 +426,7 @@ def dna2OneHot(dnaSeq):
         try:
             seqMatrix[DNA2Index[dnaSeq[j]], j] = 1
         except KeyError as e:
-            print(f"Keyerror happened at position {j}: {dnaSeq[j]}, legal keys are: [A, C, G, T, N]")
+            logger.error(f"Keyerror happened at position {j}: {dnaSeq[j]}, legal keys are: [A, C, G, T, N]")
             continue
     return seqMatrix
 
@@ -462,8 +464,8 @@ def extract_bw(chrom, start, end, strand, bigwigs):
                 c = c[::-1] 
             chroms_array.append(c)
     except RuntimeError as e:
-        logging.warning(e)
-        logging.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
+        logger.warning(e)
+        logger.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
         raise BigWigInaccessible(chrom, start, end)
     chroms_array = np.vstack(chroms_array)  # create the chromatin track array, shape (num_tracks, length)
     
@@ -486,8 +488,8 @@ def extract_target(chrom, start, end, strand, target):
             if strand=="-":
                 target_array = target_array[::-1]
         except RuntimeError as e:
-            logging.warning(e)
-            logging.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
+            logger.warning(e)
+            logger.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
             raise BigWigInaccessible(chrom, start, end)
     else:
         target_array = np.array([np.nan], dtype="float32")
