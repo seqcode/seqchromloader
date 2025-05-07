@@ -22,6 +22,8 @@ from pytorch_lightning import LightningDataModule
 
 from seqchromloader import utils
 
+logger = logging.getLogger(__name__)
+
 class SeqChromLoader():
     """
     :param dataloader_kws: keyword arguments passed to ``torch.utils.data.DataLoader``
@@ -174,10 +176,10 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
                     patch_right=self.patch_right
                 )
             except utils.BigWigInaccessible as e:
-                logging.warn(f"Inaccessible bigwig error detected in region {item.chrom}:{item.start}-{item.end}, Skipping...")
+                logger.warning(f"Inaccessible bigwig error detected in region {item.chrom}:{item.start}-{item.end}, Skipping...")
                 continue
             except AssertionError as e:
-                logging.warn(f"AssertionError detected in region {item.chrom}:{item.start}-{item.end}, Skipping")
+                logger.warning(f"AssertionError detected in region {item.chrom}:{item.start}-{item.end}, Skipping")
                 continue
 
             if not self.return_region:
