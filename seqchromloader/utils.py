@@ -152,9 +152,9 @@ def make_gc_match(coords, genome_fa, l=500, n=None, seed=1, gc_diff_max=0.05, ma
     :type gc_diff_max: float
     :param max_attemps: maximum number of attempts to shuffle the input dataframe for extracting GC matched regions
     :type max_attemps: int
-    :param excl: regions that chopped regions should overlap with
+    :param excl: regions that chopped regions shouldn't overlap with
     :type excl: BedTool object
-    :param incl: regions that chopped regions shouldn't overlap with
+    :param incl: regions that chopped regions should overlap with
     :type incl: BedTool object
     :rtype: GC match region coordinate dataframe
     """
