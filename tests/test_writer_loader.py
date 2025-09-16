@@ -5,7 +5,7 @@ import pandas as pd
 from functools import partial
 
 from torch import threshold
-from seqchromloader import SeqChromDatasetByDataFrame, SeqChromDatasetByBed, SeqChromDatasetByWds, SeqChromDataModule
+from seqchromloader import SeqChromDatasetByDataFrame, SeqChromDatasetByBed, SeqChromDatasetByWds
 from seqchromloader import dump_data_webdataset, convert_data_webdataset
 from seqchromloader import get_genome_sizes, make_random_shift, make_flank, random_coords, chop_genome, make_gc_match, make_motif_match
 
@@ -346,46 +346,6 @@ class Test(unittest.TestCase):
         ))
         region, seq, chrom, target, label = next(it)
         self.assertEqual(region[0], "chr19:0-5")
-
-    def test_lightning_datamodule(self):
-        dm = SeqChromDataModule(
-            train_wds="data/test_0.tar.gz",
-            val_wds="data/test_0.tar.gz",
-            test_wds="data/test_0.tar.gz",
-            train_dataset_size=100,
-            batch_size=3,
-            num_workers=1,
-            patch_last=False,
-        )
-        dm.setup()
-        val_dl = iter(dm.val_dataloader())
-        seq, chrom, target, label = next(val_dl)
-        self.assertEqual(seq[0,0,3].item(), 1.0)
-        self.assertEqual(chrom[0,0,3].item(), 4.0)
-        self.assertEqual(target[0].item(), 0.0)
-        self.assertEqual(label[1].item(), 1)
-
-    def test_lightning_datamodule_transform(self):
-        dm = SeqChromDataModule(
-            train_wds="data/test_0.tar.gz",
-            val_wds="data/test_0.tar.gz",
-            test_wds="data/test_0.tar.gz",
-            transforms={"seq": test_seq_transform,
-                        "chrom": test_chrom_transform,
-                        "target": test_target_transform},
-            train_dataset_size=100,
-            batch_size=3,
-            num_workers=1,
-            patch_last=False,
-        )
-        dm.setup()
-        val_dl = iter(dm.val_dataloader())
-        seq, chrom, target, label = next(val_dl)
-        
-        self.assertEqual(seq[0,0,3].item(), 2.0)
-        self.assertAlmostEqual(chrom[0,0,3].item(), 4.0/3)
-        self.assertEqual(target[0].item(), 0.0)
-        self.assertEqual(label[1].item(), 1)
 
     def test_make_gc_match_regions(self):
         # input region gc content is 0.345
