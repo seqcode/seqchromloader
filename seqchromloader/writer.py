@@ -189,7 +189,7 @@ def dump_data_webdataset_worker(coords,
             logger.warning(f"Skip the region {item.chrom}:{item.start}-{item.end} due to pyfaidx FetchError")
             continue
         except AssertionError as e:
-            logger.warning(f"Skip the region {item.chrom}:{item.start}-{item.end} due to AssertionError")
+            logger.warning(f"Skip the region {item.chrom}:{item.start}-{item.end} due to AssertionError: {e}")
             continue
         
         feature_dict = defaultdict()
