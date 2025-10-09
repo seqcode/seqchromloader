@@ -150,9 +150,15 @@ def dump_data_webdataset_worker(coords,
     genome_pyfaidx = pyfaidx.Fasta(fasta)
     bigwigs = [pyBigWig.open(bw) for bw in bigwig_files] if bigwig_files is not None else None
     if target_bam is not None:
-        target = pysam.AlignmentFile(target_bam)
+        if isinstance(target_bam, list):
+            target = [pysam.AlignmentFile(b) for b in target_bam]
+        else:
+            target = pysam.AlignmentFile(target_bam)
     elif target_bw is not None:
-        target = pyBigWig.open(target_bw)
+        if isinstance(target_bw, list):
+            target = [pyBigWig.open(b) for b in target_bw]
+        else:
+            target = pyBigWig.open(target_bw)
     else:
         target = None
 

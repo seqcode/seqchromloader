@@ -101,7 +101,7 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
     :type genome_fasta: str
     :param bigwig_filelist: A list of bigwig files containing track information (e.g., histone modifications)
     :type bigwig_filelist: list of str or None
-    :param target_bam: bam file to get # reads in each region
+    :param target_bam: single or list of bam file to get # reads in each region
     :type target_bam: str or None
     :param transforms: A dictionary of functions to transform the output data, accepted keys are *["seq", "chrom", "target", "label"]*
     :type transforms: dict of functions
@@ -141,7 +141,10 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
         self.genome_pyfaidx = pyfaidx.Fasta(self.genome_fasta)
         self.bigwigs = [pyBigWig.open(bw) for bw in self.bigwig_filelist] if self.bigwig_filelist is not None else None
         if self.target_bam is not None:
-            self.target_pysam = pysam.AlignmentFile(self.target_bam)
+            if isinstance(self.target_bam, list):
+                self.target_pysam = [pysam.AlignmentFile(b) for b in self.target_bam]
+            else:
+                self.target_pysam = pysam.AlignmentFile(self.target_bam)
         # shuffle the dataframe if need
         if self.shuffle:
             self.dataframe.sample(frac=1., replace=False)

@@ -479,7 +479,7 @@ def extract_dnaOneHot(chrom, start, end, strand, genome_pyfaidx):
     
     return seq_array
 
-def extract_target(chrom, start, end, strand, target):
+def extract_single_target(chrom, start, end, strand, target):
     if isinstance(target, pysam.AlignmentFile):
         target_array = np.array(target.count(chrom, start, end), dtype=np.float32)[np.newaxis]
     elif isinstance(target, pyBigWig.pyBigWig):
@@ -494,6 +494,13 @@ def extract_target(chrom, start, end, strand, target):
     else:
         target_array = np.array([np.nan], dtype="float32")
     return target_array
+
+def extract_target(chrom, start, end, strand, target):
+    if isinstance(target, list):
+        target_arrs = [extract_single_target(chrom, start, end, strand, t) for t in target]
+        return np.stack(target_arrs)
+    else:
+        return extract_single_target(chrom, start, end, strand, target)
 
 def extract_info(chrom, start, end, label, genome_pyfaidx, bigwigs, target, strand="+", transforms:dict=None, patch_left=0, patch_right=0):
     if patch_left > 0: patched_start = start - patch_left 
