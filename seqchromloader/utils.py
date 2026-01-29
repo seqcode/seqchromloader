@@ -132,7 +132,7 @@ def make_flank(coords, L, d):
                 .apply(lambda s: pd.Series([s["chrom"], int(s["midpoint"]-L/2), int(s["midpoint"]+L/2)],
                                             index=["chrom", "start", "end"]), axis=1))
 
-def make_gc_match(coords, genome_fa, l=500, n=None, seed=1, gc_diff_max=0.05, max_attemps=1000, incl=None, excl=None):
+def make_gc_match(coords, genome_fa, n, l=500, seed=1, gc_diff_max=0.05, max_attemps=1000, incl=None, excl=None):
     """
     Make GC amtch regions by:
     1. Randomly shuffle genomic regions by bedtools
@@ -168,16 +168,42 @@ def make_gc_match(coords, genome_fa, l=500, n=None, seed=1, gc_diff_max=0.05, ma
     gc_percent_global = gc_total / nuc_total
     logger.info(f"Global GC content of input regions is {gc_percent_global}")
 
+    return make_gc_match_given_ratio(gc_percent_global, n, genome_fa)
+
+
+def make_gc_match_given_ratio(gc_ratio, n, genome_fa, l=500, seed=1, gc_diff_max=0.05, max_attemps=1000, incl=None, excl=None):
+    """
+    Make GC amtch regions by:
+    1. Randomly shuffle genomic regions by bedtools
+    2. Keep regions of GC content matching the global original coordinate dataframes
+
+    :param gc_ratio: expected GC ratio
+    :type gc_ratio: float
+    :param l: random interval size
+    :type l: integer
+    :param n: number of returned GC matched regions
+    :type n: int
+    :param seed: random seed
+    :type seed: int
+    :param gc_diff_max: allowed gc percentage difference between input and returned regions
+    :type gc_diff_max: float
+    :param max_attemps: maximum number of attempts to shuffle the input dataframe for extracting GC matched regions
+    :type max_attemps: int
+    :param excl: regions that chopped regions shouldn't overlap with
+    :type excl: BedTool object
+    :param incl: regions that chopped regions should overlap with
+    :type incl: BedTool object
+    :rtype: GC match region coordinate dataframe
+    """
+    genome_pyfaidx = Fasta(genome_fa)
     # shuffle regions and keep those of similar gc percentage
     rng = np.random.RandomState(seed)    # create a random number generator by given seed to get different shuffled regions per loop
-    input_bed = BedTool.from_dataframe(coords)
-    n = len(coords) if n is None else n
     return_regions = []
     for i in range(max_attemps):
         regions_shuffle = random_coords(gs=f'{genome_fa}.fai', incl=incl, excl=excl, l=l, n=n, seed=rng.randint(1e5))
         for item in regions_shuffle.itertuples():
             subseq = genome_pyfaidx[item.chrom][item.start:item.end]
-            if abs(subseq.gc - gc_percent_global) <= gc_diff_max:
+            if abs(subseq.gc - gc_ratio) <= gc_diff_max:
                 return_regions.append(item)
                 if len(return_regions) >= n:
                     return pd.DataFrame(return_regions)[['chrom', 'start', 'end']]
