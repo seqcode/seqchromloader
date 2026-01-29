@@ -168,7 +168,7 @@ def make_gc_match(coords, genome_fa, n, l=500, seed=1, gc_diff_max=0.05, max_att
     gc_percent_global = gc_total / nuc_total
     logger.info(f"Global GC content of input regions is {gc_percent_global}")
 
-    return make_gc_match_given_ratio(gc_percent_global, n, genome_fa)
+    return make_gc_match_given_ratio(gc_percent_global, n, genome_fa, l=l, seed=seed, gc_diff_max=gc_diff_max, max_attemps=max_attemps, incl=incl, excl=excl)
 
 
 def make_gc_match_given_ratio(gc_ratio, n, genome_fa, l=500, seed=1, gc_diff_max=0.05, max_attemps=1000, incl=None, excl=None):
