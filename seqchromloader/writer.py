@@ -14,11 +14,10 @@ from multiprocessing import Pool
 
 import pyfaidx
 import pysam
-import pyBigWig
 import webdataset as wds
 
-from . import utils
-from .loader import _SeqChromDatasetByWds
+from seqchromloader import utils
+from seqchromloader.loader import _SeqChromDatasetByWds
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +147,7 @@ def dump_data_webdataset_worker(coords,
                                 ):
     #get handlers
     genome_pyfaidx = pyfaidx.Fasta(fasta)
-    bigwigs = [pyBigWig.open(bw) for bw in bigwig_files] if bigwig_files is not None else None
+    bigwigs = [utils.BigWig(bw) for bw in bigwig_files] if bigwig_files is not None else None
     if target_bam is not None:
         if isinstance(target_bam, list):
             target = [pysam.AlignmentFile(b) for b in target_bam]
@@ -156,9 +155,9 @@ def dump_data_webdataset_worker(coords,
             target = pysam.AlignmentFile(target_bam)
     elif target_bw is not None:
         if isinstance(target_bw, list):
-            target = [pyBigWig.open(b) for b in target_bw]
+            target = [utils.BigWig(b) for b in target_bw]
         else:
-            target = pyBigWig.open(target_bw)
+            target = utils.BigWig(target_bw)
     else:
         target = None
 

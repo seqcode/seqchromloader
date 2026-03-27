@@ -10,7 +10,7 @@ import torch
 import random
 import pysam
 import pyfaidx
-import pyBigWig
+import pybigtools
 import numpy as np
 import pandas as pd
 import webdataset as wds
@@ -19,7 +19,7 @@ from itertools import islice
 from torch.utils.data import Dataset, IterableDataset, DataLoader
 from pybedtools import BedTool
 
-from seqchromloader import utils
+from seqchromloader import utils, config
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,7 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
         # create the stream handler after child processes spawned to enable parallel reading
         # this function will be called by worker_init_function in DataLoader
         self.genome_pyfaidx = pyfaidx.Fasta(self.genome_fasta)
-        self.bigwigs = [pyBigWig.open(bw) for bw in self.bigwig_filelist] if self.bigwig_filelist is not None else None
+        self.bigwigs = [utils.BigWig(bw_path) for bw_path in self.bigwig_filelist] if self.bigwig_filelist is not None else None
         if self.target_bam is not None:
             if isinstance(self.target_bam, list):
                 self.target_pysam = [pysam.AlignmentFile(b) for b in self.target_bam]

@@ -8,13 +8,48 @@ import numpy as np
 import logging
 import pysam
 import pyBigWig
+import pybigtools
 from Bio import motifs
 from pyfaidx import Fasta
 from multiprocessing import Pool
 from pybedtools import Interval, BedTool
 from pybedtools.helpers import chromsizes
 
+from seqchromloader import config
+
 logger = logging.getLogger(__name__)
+
+class BigWig():
+    def __init__(self, bw_path, backend='pyBigWig'):
+        if backend == 'pyBigWig':
+            self.bw = pyBigWig.open(bw_path)
+        else:
+            self.bw = pybigtools.open(bw_path)
+        self.backend = backend
+
+    def intervals(self, chrom):
+        if self.backend == 'pyBigWig':
+            return self.bw.intervals(chrom)
+        else:
+            return self.bw.records(chrom)
+
+    def stats(self, chrom, type='mean'):
+        if self.backend == 'pyBigWig':
+            return self.bw.stats(chrom, type=type, exact=True)[0]
+        else:
+            return self.bw.values(chrom, missing=np.nan, bins=1, exact=True, summary='mean')[0].item()
+
+    def values(self, chrom, start, end, missing=0):
+        if self.backend == 'pyBigWig':
+            return np.nan_to_num(self.bw.values(chrom, start, end)).astype(np.float32)
+        else:
+            return self.bw.values(chrom, start, end, missing=0.).astype(np.float32)
+    
+    def chroms(self):
+        return self.chroms()
+
+    def close(self):
+        self.bw.close()
 
 def get_genome_sizes(gs=None, genome=None, to_filter=None, to_keep=None):
     """
@@ -372,7 +407,7 @@ def compute_mean_std_bigwig(bigwig):
     :type bigwig: str
     :rtype: (mean, stddev)
     """
-    bw = pyBigWig.open(bigwig)
+    bw = BigWig(bigwig)
     
     # get chrom length list
     chroms = bw.chroms()
@@ -485,7 +520,7 @@ def extract_bw(chrom, start, end, strand, bigwigs):
     chroms_array = []
     try:
         for idx, bigwig in enumerate(bigwigs):
-            c = (np.nan_to_num(bigwig.values(chrom, start, end))).astype(np.float32)
+            c = bigwig.values(chrom, start, end)
             if strand=="-":
                 c = c[::-1] 
             chroms_array.append(c)
@@ -508,9 +543,9 @@ def extract_dnaOneHot(chrom, start, end, strand, genome_pyfaidx):
 def extract_single_target(chrom, start, end, strand, target):
     if isinstance(target, pysam.AlignmentFile):
         target_array = np.array(target.count(chrom, start, end), dtype=np.float32)[np.newaxis]
-    elif isinstance(target, pyBigWig.pyBigWig):
+    elif isinstance(target, BigWig):
         try:
-            target_array = np.nan_to_num(target.values(chrom, start, end)).astype(np.float32)
+            target_array = target.values(chrom, start, end)
             if strand=="-":
                 target_array = target_array[::-1]
         except RuntimeError as e:

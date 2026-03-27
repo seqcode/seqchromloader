@@ -18,6 +18,10 @@ from pybedtools import BedTool
 from pyfaidx import Fasta
 from pyjaspar import jaspardb
 
+import seqchromloader
+
+seqchromloader.config.set_bigwig_backend('pybigtools')
+
 class Test(unittest.TestCase):
     def setUp(self) -> None:
         pass
