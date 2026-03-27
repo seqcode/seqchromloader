@@ -46,7 +46,7 @@ class BigWig():
             return self.bw.values(chrom, start, end, missing=0.).astype(np.float32)
     
     def chroms(self):
-        return self.chroms()
+        return self.bw.chroms()
 
     def close(self):
         self.bw.close()
