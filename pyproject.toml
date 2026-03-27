@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "seqchromloader"
-version = "0.10.1"
+version = "0.10.2"
 description = "Utilities for training DL models using DNA sequence and chromatin inputs"
 authors = [{name = "Jianyu Yang", email = "yztxwd@gmail.com"},]
 readme = "README.md"
