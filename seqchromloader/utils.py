@@ -418,9 +418,9 @@ def compute_mean_std_bigwig(bigwig):
         # iterate all intervals to get the covered length
         length = sum([i[1]-i[0] for i in bw.intervals(chrom)])
         ns.append(length)
-        means.append(bw.stats(chrom, type="mean", exact=True)[0])
+        means.append(bw.stats(chrom, type="mean", exact=True))
         try:
-            stds.append(bw.stats(chrom, type="std", exact=True)[0])
+            stds.append(bw.stats(chrom, type="std", exact=True))
         except RuntimeError:
             logger.error(chrom)
             logger.error(length)
