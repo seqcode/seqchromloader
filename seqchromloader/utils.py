@@ -33,11 +33,11 @@ class BigWig():
         else:
             return self.bw.records(chrom)
 
-    def stats(self, chrom, type='mean'):
+    def stats(self, chrom, type='mean', exact=True):
         if self.backend == 'pyBigWig':
-            return self.bw.stats(chrom, type=type, exact=True)[0]
+            return self.bw.stats(chrom, type=type, exact=exact)[0]
         else:
-            return self.bw.values(chrom, missing=np.nan, bins=1, exact=True, summary='mean')[0].item()
+            return self.bw.values(chrom, missing=np.nan, bins=1, exact=exact, summary='mean')[0].item()
 
     def values(self, chrom, start, end, missing=0):
         if self.backend == 'pyBigWig':
