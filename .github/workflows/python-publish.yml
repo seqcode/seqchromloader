@@ -61,7 +61,7 @@ jobs:
         run: python -m build --sdist --wheel --outdir dist/
 
       - name: Python compile check
-        run: python -m py_compile tpcav/*.py scripts/*.py test/*.py
+        run: python -m py_compile seqchromloader/*.py tests/*.py
 
       - name: Twine check
         run: python -m twine check --strict dist/*
