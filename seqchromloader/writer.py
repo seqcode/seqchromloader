@@ -99,7 +99,7 @@ def dump_data_webdataset(coords, genome_fasta, bigwig_filelist,
 
     # split coordinates and assign chunks to workers
     num_chunks = math.ceil(len(coords) / samples_per_tar)
-    chunks = np.array_split(coords, num_chunks)
+    chunks = [coords.iloc[idx] for idx in np.array_split(np.arange(len(coords)), num_chunks)]
     
     # freeze the common parameters
     ## create a scaler to get statistics for normalizing chromatin marks input
