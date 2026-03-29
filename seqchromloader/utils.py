@@ -2,6 +2,7 @@
 Utilities for iterating constructing data sets and iterating over
 DNA sequence data.
 """
+import os
 import math
 import pandas as pd
 import numpy as np
@@ -20,11 +21,47 @@ from seqchromloader import config
 logger = logging.getLogger(__name__)
 
 class BigWig():
-    def __init__(self, bw_path, backend='pyBigWig'):
+    def __init__(self, bw_path, memmap_dir=None, backend='pyBigWig'):
         if backend == 'pyBigWig':
             self.bw = pyBigWig.open(bw_path)
-        else:
+            self._chroms = self.bw.chroms()
+        elif backend == 'pybigtools':
             self.bw = pybigtools.open(bw_path)
+            self._chroms = self.bw.chroms()
+        elif backend == 'memmap':
+            # load all chromosomes using np.memmap
+            if memmap_dir is None:
+                memmap_dir = bw_path + ".memmap"
+
+            self.memmap_dir = memmap_dir
+            os.makedirs(self.memmap_dir, exist_ok=True)
+
+            # open bigwig via pybigtools
+            self.bw = pybigtools.open(bw_path)
+
+            self.arrays = {}
+            self._chroms = {}
+
+            # build memmap if not exists
+            for chrom, length in self.bw.chroms().items():
+                npy_path = os.path.join(self.memmap_dir, f"{chrom}.npy")
+
+                if not os.path.exists(npy_path):
+                    logger.info(f"[memmap] dumping {chrom}...")
+
+                    # load full chromosome
+                    data = self.bw.values(chrom, 0, length, missing=0.0)
+
+                    # save
+                    np.save(npy_path, data)
+
+                # load as memmap
+                arr = np.load(npy_path, mmap_mode='r')
+                self.arrays[chrom] = arr
+                self._chroms[chrom] = arr.shape[0]
+        else:
+            raise Exception(f"Unknown Backend: {backend}")
+
         self.backend = backend
 
     def intervals(self, chrom):
@@ -36,17 +73,34 @@ class BigWig():
     def stats(self, chrom, type='mean', exact=True):
         if self.backend == 'pyBigWig':
             return self.bw.stats(chrom, type=type, exact=exact)[0]
-        else:
+        elif self.backend == 'pybigtools':
             return self.bw.values(chrom, missing=np.nan, bins=1, exact=exact, summary='mean')[0].item()
+        elif self.backend == 'memmap':
+            arr = self.arrays[chrom]
+            if type == 'mean':
+                return float(np.mean(arr))
+            elif type == 'max':
+                return float(np.max(arr))
+            elif type == 'min':
+                return float(np.min(arr))
+            else:
+                raise NotImplementedError(f"stat {type} not implemented for memmap backend")
 
     def values(self, chrom, start, end, missing=0):
         if self.backend == 'pyBigWig':
-            return np.nan_to_num(self.bw.values(chrom, start, end)).astype(np.float32)
-        else:
-            return self.bw.values(chrom, start, end, missing=0.).astype(np.float32)
+            return np.nan_to_num(self.bw.values(chrom, start, end), nan=missing).astype(np.float32)
+        elif self.backend == 'pybigtools':
+            return self.bw.values(chrom, start, end, missing=missing).astype(np.float32)
+        elif self.backend == 'memmap':
+            arr = self.arrays[chrom]
+
+            start = max(0, start)
+            end = min(arr.shape[0], end)
+
+            return arr[start:end] # no copy
     
     def chroms(self):
-        return self.bw.chroms()
+        return self._chroms
 
     def close(self):
         self.bw.close()
