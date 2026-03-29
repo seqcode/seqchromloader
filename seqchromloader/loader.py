@@ -139,7 +139,7 @@ class _SeqChromDatasetByDataFrame(IterableDataset):
         # create the stream handler after child processes spawned to enable parallel reading
         # this function will be called by worker_init_function in DataLoader
         self.genome_pyfaidx = pyfaidx.Fasta(self.genome_fasta)
-        self.bigwigs = [utils.BigWig(bw_path) for bw_path in self.bigwig_filelist] if self.bigwig_filelist is not None else None
+        self.bigwigs = [utils.BigWig(bw_path, backend=config.BIGWIG_BACKEND) for bw_path in self.bigwig_filelist] if self.bigwig_filelist is not None else None
         if self.target_bam is not None:
             if isinstance(self.target_bam, list):
                 self.target_pysam = [pysam.AlignmentFile(b) for b in self.target_bam]

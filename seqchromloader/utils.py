@@ -461,7 +461,7 @@ def compute_mean_std_bigwig(bigwig):
     :type bigwig: str
     :rtype: (mean, stddev)
     """
-    bw = BigWig(bigwig)
+    bw = BigWig(bigwig, backend=config.BIGWIG_BACKEND)
     
     # get chrom length list
     chroms = bw.chroms()
