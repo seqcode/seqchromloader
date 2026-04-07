@@ -11,8 +11,7 @@ import pysam
 import pyBigWig
 from Bio import motifs
 from pyfaidx import Fasta
-from multiprocessing import Pool
-from pybedtools import Interval, BedTool
+from pybedtools import BedTool
 from pybedtools.helpers import chromsizes
 
 from seqchromloader import config
@@ -79,7 +78,7 @@ class BigWig():
             start = max(0, start)
             end = min(arr.shape[0], end)
 
-            return arr[start:end] # no copy
+            return arr[start:end].astype(np.float32) # no copy
     
     def chroms(self):
         return self._chroms
