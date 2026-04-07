@@ -83,6 +83,8 @@ class BigWig():
                 return float(np.max(arr))
             elif type == 'min':
                 return float(np.min(arr))
+            elif type == 'std':
+                return float(np.std(arr))
             else:
                 raise NotImplementedError(f"stat {type} not implemented for memmap backend")
 
