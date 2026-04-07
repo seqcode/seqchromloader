@@ -9,7 +9,6 @@ import numpy as np
 import logging
 import pysam
 import pyBigWig
-import pybigtools
 from Bio import motifs
 from pyfaidx import Fasta
 from multiprocessing import Pool
@@ -25,9 +24,6 @@ class BigWig():
         if backend == 'pyBigWig':
             self.bw = pyBigWig.open(bw_path)
             self._chroms = self.bw.chroms()
-        elif backend == 'pybigtools':
-            self.bw = pybigtools.open(bw_path)
-            self._chroms = self.bw.chroms()
         elif backend == 'memmap':
             # load all chromosomes using np.memmap
             if memmap_dir is None:
@@ -36,8 +32,8 @@ class BigWig():
             self.memmap_dir = memmap_dir
             os.makedirs(self.memmap_dir, exist_ok=True)
 
-            # open bigwig via pybigtools
-            self.bw = pybigtools.open(bw_path)
+            # open bigwig via pyBigWig
+            self.bw = pyBigWig.open(bw_path)
 
             self.arrays = {}
             self._chroms = {}
@@ -50,7 +46,7 @@ class BigWig():
                     logger.info(f"[memmap] dumping {chrom}...")
 
                     # load full chromosome
-                    data = self.bw.values(chrom, 0, length, missing=0.0)
+                    data = np.nan_to_num(self.bw.values(chrom, 0, length, numpy=True), nan=0.0).astype(np.float32)
 
                     # save
                     np.save(npy_path, data)
@@ -65,34 +61,18 @@ class BigWig():
         self.backend = backend
 
     def intervals(self, chrom):
-        if self.backend == 'pyBigWig':
-            return self.bw.intervals(chrom)
-        else:
-            return self.bw.records(chrom)
+        return self.bw.intervals(chrom)
 
     def stats(self, chrom, type='mean', exact=True):
         if self.backend == 'pyBigWig':
-            return self.bw.stats(chrom, type=type, exact=exact)[0]
-        elif self.backend == 'pybigtools':
-            return self.bw.values(chrom, missing=np.nan, bins=1, exact=exact, summary=type)[0].item()
+            return np.float32(self.bw.stats(chrom, type=type, exact=exact)[0])
         elif self.backend == 'memmap':
-            arr = self.arrays[chrom]
-            if type == 'mean':
-                return float(np.mean(arr))
-            elif type == 'max':
-                return float(np.max(arr))
-            elif type == 'min':
-                return float(np.min(arr))
-            elif type == 'std':
-                return float(np.std(arr))
-            else:
-                raise NotImplementedError(f"stat {type} not implemented for memmap backend")
+            # use pyBigWig to obtain stats to avoid load full chromosome arrays into memory
+            return np.float32(self.bw.stats(chrom, type=type, exact=exact)[0])
 
     def values(self, chrom, start, end, missing=0):
         if self.backend == 'pyBigWig':
-            return np.nan_to_num(self.bw.values(chrom, start, end), nan=missing).astype(np.float32)
-        elif self.backend == 'pybigtools':
-            return self.bw.values(chrom, start, end, missing=missing).astype(np.float32)
+            return np.nan_to_num(self.bw.values(chrom, start, end, numpy=True), nan=missing).astype(np.float32)
         elif self.backend == 'memmap':
             arr = self.arrays[chrom]
 

@@ -3,6 +3,6 @@ BIGWIG_BACKEND='pyBigWig'
 def set_bigwig_backend(backend):
     global BIGWIG_BACKEND
     
-    assert backend in ['pyBigWig', 'pybigtools', 'memmap'], "Backend options are pyBigWig, memmap or pybigtools!"
+    assert backend in ['pyBigWig', 'memmap'], "Backend options are pyBigWig or memmap!"
 
     BIGWIG_BACKEND = backend

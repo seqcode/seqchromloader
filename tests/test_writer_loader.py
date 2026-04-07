@@ -20,9 +20,9 @@ from pyjaspar import jaspardb
 
 import seqchromloader
 
-seqchromloader.config.set_bigwig_backend('pybigtools')
+#seqchromloader.config.set_bigwig_backend('memmap')
 
-class Test(unittest.TestCase):
+class Test:
     def setUp(self) -> None:
         pass
 
@@ -40,6 +40,10 @@ class Test(unittest.TestCase):
     def assertIsFile(self, path):
         if not pl.Path(path).resolve().is_file():
             raise AssertionError("File does not exist: %s" % str(path))
+
+    def test_compute_mean_std_bw(self):
+        bw_f = "data/sample.bw"
+        mean, std = seqchromloader.utils.compute_mean_std_bigwig(bw_f)
         
     def test_get_genome_sizes(self):
         genome_sizes_nochr10=get_genome_sizes(genome="mm10", to_filter=["chr10"])
@@ -389,6 +393,3 @@ def test_chrom_transform(chrom):
 
 def test_target_transform(target):
     return target * 3
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)

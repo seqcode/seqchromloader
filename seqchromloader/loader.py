@@ -7,16 +7,13 @@ description = """
 import math
 import logging
 import torch
-import random
 import pysam
 import pyfaidx
-import pybigtools
 import numpy as np
 import pandas as pd
 import webdataset as wds
-from math import sqrt, ceil
 from itertools import islice
-from torch.utils.data import Dataset, IterableDataset, DataLoader
+from torch.utils.data import IterableDataset, DataLoader
 from pybedtools import BedTool
 
 from seqchromloader import utils, config

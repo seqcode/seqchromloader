@@ -8,6 +8,6 @@ from .utils import logger as utils_logger
 
 import logging
 def mute_warning():
-    loader_logger.setLevel(logging.ERROR)
-    writer_logger.setLevel(logging.ERROR)
-    utils_logger.setLevel(logging.ERROR)
+    loader_logger.setLevel(logging.INFO)
+    writer_logger.setLevel(logging.INFO)
+    utils_logger.setLevel(logging.INFO)
