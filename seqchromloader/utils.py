@@ -74,7 +74,7 @@ class BigWig():
         if self.backend == 'pyBigWig':
             return self.bw.stats(chrom, type=type, exact=exact)[0]
         elif self.backend == 'pybigtools':
-            return self.bw.values(chrom, missing=np.nan, bins=1, exact=exact, summary='mean')[0].item()
+            return self.bw.values(chrom, missing=np.nan, bins=1, exact=exact, summary=type)[0].item()
         elif self.backend == 'memmap':
             arr = self.arrays[chrom]
             if type == 'mean':
@@ -84,7 +84,7 @@ class BigWig():
             elif type == 'min':
                 return float(np.min(arr))
             elif type == 'std':
-                return float(np.std(arr))
+                return self.bw.values(chrom, missing=np.nan, bins=1, exact=exact, summary=type)[0].item()
             else:
                 raise NotImplementedError(f"stat {type} not implemented for memmap backend")
 
