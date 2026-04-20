@@ -559,9 +559,13 @@ def extract_bw(chrom, start, end, strand, bigwigs):
             if strand=="-":
                 c = c[::-1] 
             chroms_array.append(c)
-    except RuntimeError as e:
-        logger.warning(e)
+    except RuntimeError:
+        #logger.warning(e)
         logger.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
+        raise BigWigInaccessible(chrom, start, end)
+    except KeyError:
+        #logger.warning(e)
+        logger.warning("KeyError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
         raise BigWigInaccessible(chrom, start, end)
     chroms_array = np.vstack(chroms_array)  # create the chromatin track array, shape (num_tracks, length)
     
@@ -583,9 +587,12 @@ def extract_single_target(chrom, start, end, strand, target):
             target_array = target.values(chrom, start, end)
             if strand=="-":
                 target_array = target_array[::-1]
-        except RuntimeError as e:
-            logger.warning(e)
+        except RuntimeError:
+            #logger.warning(e)
             logger.warning(f"RuntimeError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
+            raise BigWigInaccessible(chrom, start, end)
+        except KeyError:
+            logger.warning(f"KeyError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
             raise BigWigInaccessible(chrom, start, end)
     else:
         target_array = np.array([np.nan], dtype="float32")
