@@ -451,15 +451,17 @@ def compute_mean_std_bigwig(bigwig):
     ns = []; means = []; stds = []
     for chrom, length in chroms.items():
         # iterate all intervals to get the covered length
-        length = sum([i[1]-i[0] for i in bw.intervals(chrom)])
-        ns.append(length)
-        means.append(bw.stats(chrom, type="mean", exact=True))
-        try:
-            stds.append(bw.stats(chrom, type="std", exact=True))
-        except RuntimeError:
-            logger.error(chrom)
-            logger.error(length)
-            raise Exception
+        intervals = bw.intervals(chrom)
+        if intervals is not None:
+            length = sum([i[1]-i[0] for i in intervals])
+            ns.append(length)
+            means.append(bw.stats(chrom, type="mean", exact=True))
+            try:
+                stds.append(bw.stats(chrom, type="std", exact=True))
+            except RuntimeError:
+                logger.error(chrom)
+                logger.error(length)
+                raise Exception
     
     # compute overall metrics
     std_all = 0
