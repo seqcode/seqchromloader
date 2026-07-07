@@ -567,7 +567,7 @@ def extract_bw(chrom, start, end, strand, bigwigs):
         raise BigWigInaccessible(chrom, start, end)
     except KeyError:
         #logger.warning(e)
-        logger.warning("KeyError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
+        logger.warning(f"KeyError happened when accessing {chrom}:{start}-{end}, it's probably due to at least one chromatin track bigwig doesn't have information in this region")
         raise BigWigInaccessible(chrom, start, end)
     chroms_array = np.vstack(chroms_array)  # create the chromatin track array, shape (num_tracks, length)
     
